@@ -134,26 +134,35 @@ aplikasi absensi/
 │   │   ├── Sidebar.jsx           # Navigasi samping
 │   │   ├── Modal.jsx             # Komponen modal dialog
 │   │   ├── StatsCard.jsx         # Kartu statistik di dashboard
-│   │   └── StatusBadge.jsx       # Badge status kehadiran
+│   │   ├── StatusBadge.jsx       # Badge status kehadiran
+│   │   ├── DebugButton.jsx       # Tombol melayang untuk memicu sistem debug
+│   │   └── DebugLogsViewer.jsx   # Modal penampil log error & terjemahan otomatis
+│   │
+│   ├── data/
+│   │   └── temanggungData.js     # Data statis hierarki kecamatan & desa SIDEDI
 │   │
 │   ├── pages/
-│   │   ├── Dashboard.jsx         # Halaman utama, real-time attendance
+│   │   ├── Dashboard.jsx         # Halaman utama, real-time attendance & statistik terpisah
 │   │   ├── UserManagement.jsx    # CRUD peserta + proses enroll fingerprint
 │   │   ├── AttendanceHistory.jsx # Riwayat absensi dengan filter tanggal
-│   │   └── SidediInternship.jsx  # Manajemen desa SIDEDI + penjadwalan
+│   │   ├── SidediInternship.jsx  # Manajemen desa SIDEDI + penjadwalan & agenda
+│   │   └── Settings.jsx          # Mode gelap, ukuran font, remote ESP32, & mode pengembang
 │   │
 │   ├── services/
 │   │   ├── attendanceService.js  # Logic absensi + Firestore CRUD
 │   │   ├── userService.js        # CRUD peserta, jurusan, pembimbing
-│   │   └── sidediService.js      # CRUD kecamatan/desa, jadwal, konfirmasi
+│   │   ├── sidediService.js      # CRUD kecamatan/desa, jadwal, konfirmasi
+│   │   ├── holidayService.js     # Sinkronisasi & caching hari libur nasional dari API
+│   │   └── debugService.js       # Global error handler & pengiriman snapshot log
 │   │
 │   └── __tests__/
 │       ├── bugExploration.test.js
 │       └── preservation.test.js
 │
-└── absensi_pkl_hcsr04_buzzer_led__1_/
-    ├── absensi_pkl_hcsr04_buzzer_led__1_.ino   # Firmware ESP32
-    └── BUG_EXPLORATION.md                       # Dokumentasi bug firmware
+└── esp32_fix/
+    ├── esp32_fix.ino             # Firmware ESP32 (Hardware Code)
+    ├── AutoSleepManager.h        # Pustaka manajemen daya/tidur otomatis
+    └── BUG_EXPLORATION.md        # Dokumentasi perbaikan bug firmware
 ```
 
 ---
