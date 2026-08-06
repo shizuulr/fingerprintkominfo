@@ -1,0 +1,500 @@
+import { useState } from 'react';
+import {
+  LuSun, LuMoon, LuMonitor, LuRotateCcw, LuType, LuCheck, LuRefreshCw,
+  LuWifi, LuWifiOff, LuUsb, LuSave, LuExternalLink, LuTriangleAlert, LuTerminal
+} from 'react-icons/lu';
+import { useTheme } from '../hooks/useTheme';
+import { publishResetRequest } from '../components/MqttListener';
+import DebugLogsViewer from '../components/DebugLogsViewer';
+
+export default function Settings() {
+  const { theme, setThemeMode, fontSize, setFontSize } = useTheme();
+
+  // Reset ESP32 state
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetStatus, setResetStatus] = useState(null);
+
+  // WiFi ESP32 state
+  const [wifiMode, setWifiMode] = useState('network'); // 'network' | 'usb'
+  const [wifiSsid, setWifiSsid] = useState('');
+  const [wifiPass, setWifiPass] = useState('');
+  const [espIp, setEspIp] = useState('');
+  const [usbPort, setUsbPort] = useState(null);
+  const [wifiStatus, setWifiStatus] = useState(null);
+  const [isSavingWifi, setIsSavingWifi] = useState(false);
+
+  // Halaman dashboard ini sedang HTTPS atau tidak (menentukan apakah fetch ke
+  // ESP32 (http://) akan diblokir browser sebagai "mixed content")
+  const isPageHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState(() => localStorage.getItem('debugMode') === 'true');
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
+  const toggleDebugMode = () => {
+    const newVal = !debugMode;
+    setDebugMode(newVal);
+    if (newVal) {
+      localStorage.setItem('debugMode', 'true');
+      window.dispatchEvent(new CustomEvent('debug-mode-activated'));
+    } else {
+      localStorage.removeItem('debugMode');
+      window.dispatchEvent(new CustomEvent('debug-mode-deactivated'));
+    }
+  };
+
+  const handleResetESP = () => {
+    setResetStatus('sending');
+    const success = publishResetRequest();
+    if (success) {
+      setResetStatus('success');
+      setTimeout(() => {
+        setResetStatus(null);
+        setShowResetConfirm(false);
+      }, 3000);
+    } else {
+      setResetStatus('error');
+      setTimeout(() => setResetStatus(null), 4000);
+    }
+  };
+
+  const handleConnectUSB = async () => {
+    try {
+      if (!('serial' in navigator)) {
+        throw new Error('Browser Anda tidak mendukung WebSerial API.');
+      }
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      setUsbPort(port);
+      setWifiStatus({ type: 'success', msg: 'Terhubung ke perangkat via USB.' });
+    } catch (err) {
+      setWifiStatus({ type: 'error', msg: 'Koneksi USB dibatalkan atau gagal: ' + err.message });
+    }
+  };
+
+  const normalizeIp = (raw) => {
+    let targetIp = raw.trim();
+    targetIp = targetIp.replace(/^https?:\/\//, '');
+    if (targetIp.endsWith('/')) targetIp = targetIp.slice(0, -1);
+    return targetIp;
+  };
+
+  // Cara paling andal: buka halaman konfigurasi bawaan ESP32 di tab baru.
+  // Ini navigasi penuh (bukan fetch dari halaman HTTPS), jadi TIDAK kena
+  // blokir mixed-content seperti metode fetch di bawah.
+  const handleOpenDevicePage = () => {
+    if (!espIp) {
+      setWifiStatus({ type: 'error', msg: 'Isi dulu IP Address ESP32 sebelum membuka halaman perangkat.' });
+      return;
+    }
+    const targetIp = normalizeIp(espIp);
+    window.open(`http://${targetIp}/`, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleSaveWifi = async (e) => {
+    e.preventDefault();
+    setIsSavingWifi(true);
+    setWifiStatus(null);
+
+    if (!wifiSsid) {
+      setWifiStatus({ type: 'error', msg: 'SSID WiFi wajib diisi.' });
+      setIsSavingWifi(false);
+      return;
+    }
+
+    try {
+      if (wifiMode === 'usb') {
+        if (!usbPort) {
+          setWifiStatus({ type: 'error', msg: 'Port USB belum terhubung. Silakan hubungkan dulu.' });
+          setIsSavingWifi(false);
+          return;
+        }
+        // Via USB
+        const encoder = new TextEncoder();
+        const writer = usbPort.writable.getWriter();
+        await writer.write(encoder.encode(`${wifiSsid},${wifiPass}\n`));
+        writer.releaseLock();
+        setWifiStatus({ type: 'success', msg: 'Data terkirim via USB. ESP32 merestart...' });
+      } else {
+        // Via Jaringan (Fetch)
+        if (!espIp) {
+          setWifiStatus({ type: 'error', msg: 'IP Address ESP32 wajib diisi jika tidak menggunakan koneksi USB.' });
+          setIsSavingWifi(false);
+          return;
+        }
+
+        if (isPageHttps) {
+          setWifiStatus({
+            type: 'error',
+            msg: 'Dashboard ini diakses via HTTPS, browser akan memblokir permintaan ke ESP32 (HTTP). Gunakan tombol "Buka Halaman Konfigurasi Perangkat" di bawah, atau mode USB.'
+          });
+          setIsSavingWifi(false);
+          return;
+        }
+
+        const formData = new URLSearchParams();
+        formData.append('ssid', wifiSsid);
+        formData.append('pass', wifiPass);
+
+        const targetIp = normalizeIp(espIp);
+
+        const res = await fetch(`http://${targetIp}/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formData.toString()
+        });
+
+        if (res.ok) {
+          setWifiStatus({ type: 'success', msg: 'Data terkirim via Jaringan. ESP32 merestart...' });
+        } else {
+          throw new Error('Respons dari ESP32 tidak valid.');
+        }
+      }
+    } catch (err) {
+      const hint = wifiMode === 'network'
+        ? ' (Kemungkinan diblokir browser karena mixed-content HTTPS→HTTP, atau IP salah/tidak satu jaringan. Coba tombol "Buka Halaman Konfigurasi Perangkat".)'
+        : '';
+      setWifiStatus({ type: 'error', msg: 'Gagal mengirim konfigurasi: ' + err.message + hint });
+    }
+    setIsSavingWifi(false);
+  };
+
+  const fontSizeOptions = [
+    { value: 'kecil', label: 'Kecil', desc: 'Font lebih kecil', icon: 'A', size: '13px' },
+    { value: 'sedang', label: 'Sedang', desc: 'Ukuran default', icon: 'A', size: '16px' },
+    { value: 'besar', label: 'Besar', desc: 'Font lebih besar', icon: 'A', size: '19px' },
+  ];
+
+  return (
+    <div className="page settings-page">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Pengaturan</h1>
+          <p className="page-subtitle">Kelola tampilan dan perangkat sistem absensi</p>
+        </div>
+      </div>
+
+      {/* ── Section 1: Tampilan / Theme ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuMonitor /> Tampilan</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">Pilih mode tampilan yang nyaman untuk mata Anda</p>
+          <div className="theme-selector">
+            <button
+              className={`theme-option ${theme === 'light' ? 'active' : ''}`}
+              onClick={() => setThemeMode('light')}
+            >
+              <div className="theme-option__icon theme-option__icon--light">
+                <LuSun />
+              </div>
+              <div className="theme-option__info">
+                <span className="theme-option__label">Mode Cerah</span>
+                <span className="theme-option__desc">Tampilan terang untuk siang hari</span>
+              </div>
+              {theme === 'light' && <span className="theme-option__check"><LuCheck /></span>}
+            </button>
+            <button
+              className={`theme-option ${theme === 'dark' ? 'active' : ''}`}
+              onClick={() => setThemeMode('dark')}
+            >
+              <div className="theme-option__icon theme-option__icon--dark">
+                <LuMoon />
+              </div>
+              <div className="theme-option__info">
+                <span className="theme-option__label">Mode Gelap</span>
+                <span className="theme-option__desc">Nyaman untuk lingkungan gelap</span>
+              </div>
+              {theme === 'dark' && <span className="theme-option__check"><LuCheck /></span>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 2: Ukuran Font ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuType /> Ukuran Font</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">Sesuaikan ukuran teks agar lebih mudah dibaca</p>
+          <div className="fontsize-selector">
+            {fontSizeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                className={`fontsize-option ${fontSize === opt.value ? 'active' : ''}`}
+                onClick={() => setFontSize(opt.value)}
+              >
+                <span className="fontsize-option__preview" style={{ fontSize: opt.size }}>
+                  {opt.icon}
+                </span>
+                <div className="fontsize-option__info">
+                  <span className="fontsize-option__label">{opt.label}</span>
+                  <span className="fontsize-option__desc">{opt.desc}</span>
+                </div>
+                {fontSize === opt.value && <span className="fontsize-option__check"><LuCheck /></span>}
+              </button>
+            ))}
+          </div>
+          {/* Live Preview */}
+          <div className="fontsize-preview">
+            <span className="fontsize-preview__label">Preview:</span>
+            <p className="fontsize-preview__text">
+              Sistem Informasi Absensi PKL — Temanggung 2026
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 3: Pengaturan Koneksi WiFi ESP32 ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuWifi /> Koneksi WiFi ESP32</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">
+            Ubah jaringan WiFi yang digunakan oleh pemindai sidik jari. Mendukung koneksi via IP Jaringan atau Serial USB.
+          </p>
+
+          {isPageHttps && wifiMode === 'network' && (
+            <div className="alert alert--warning" style={{ marginBottom: '12px' }}>
+              <LuTriangleAlert /> Dashboard ini diakses via HTTPS. Browser kemungkinan akan
+              memblokir permintaan langsung ke ESP32 (HTTP). Disarankan pakai tombol
+              &quot;Buka Halaman Konfigurasi Perangkat&quot; di bawah, atau mode USB.
+            </div>
+          )}
+
+          <div className="wifi-settings-container">
+            <div className="wifi-mode-selector" style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+              <button
+                type="button"
+                className={`btn ${wifiMode === 'network' ? 'btn--primary' : 'btn--secondary'}`}
+                onClick={() => { setWifiMode('network'); setWifiStatus(null); }}
+              >
+                <LuWifi /> Mode Jaringan (HTTP)
+              </button>
+              <button
+                type="button"
+                className={`btn ${wifiMode === 'usb' ? 'btn--primary' : 'btn--secondary'}`}
+                onClick={() => { setWifiMode('usb'); setWifiStatus(null); }}
+              >
+                <LuUsb /> Mode Kabel (USB)
+              </button>
+            </div>
+
+            {wifiMode === 'usb' && (
+              <div className="wifi-usb-section">
+                <button
+                  type="button"
+                  className={`btn ${usbPort ? 'btn--success' : 'btn--secondary'} btn--usb-connect`}
+                  onClick={handleConnectUSB}
+                  disabled={usbPort !== null}
+                >
+                  <LuUsb /> {usbPort ? 'Tersambung via USB' : 'Hubungkan via USB'}
+                </button>
+                {usbPort && (
+                  <span className="badge badge--success" style={{ marginLeft: '12px' }}>
+                    WebSerial Aktif
+                  </span>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveWifi} className="wifi-form">
+              <div className="form-group">
+                <label>SSID WiFi Baru</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Nama Jaringan WiFi"
+                  value={wifiSsid}
+                  onChange={(e) => setWifiSsid(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label>Password WiFi (kosongkan jika jaringan terbuka)</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Kata Sandi WiFi"
+                  value={wifiPass}
+                  onChange={(e) => setWifiPass(e.target.value)}
+                />
+              </div>
+
+              {wifiMode === 'network' && (
+                <div className="form-group">
+                  <label>IP Address ESP32</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Contoh: 192.168.1.10"
+                    value={espIp}
+                    onChange={(e) => setEspIp(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {wifiStatus && (
+                <div className={`alert alert--${wifiStatus.type}`} style={{ marginBottom: '16px' }}>
+                  {wifiStatus.type === 'success' ? <LuCheck /> : <LuRefreshCw />} {wifiStatus.msg}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={isSavingWifi}
+                style={{ width: '100%' }}
+              >
+                {isSavingWifi ? 'Mengirim...' : <><LuSave /> Simpan & Restart ESP32</>}
+              </button>
+
+              {wifiMode === 'network' && (
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={handleOpenDevicePage}
+                  style={{ width: '100%', marginTop: '8px' }}
+                >
+                  <LuExternalLink /> Buka Halaman Konfigurasi Perangkat
+                </button>
+              )}
+
+              <p className="text-muted text-center" style={{ marginTop: '12px', fontSize: '0.8rem' }}>
+                Mode pengiriman: {wifiMode === 'usb' ? <strong>Kabel USB (Serial)</strong> : <strong>Jaringan (HTTP POST)</strong>}
+              </p>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 4: Reset ESP32 ── */}
+      <div className="card settings-card settings-card--danger">
+        <div className="card-header">
+          <h2><LuRotateCcw /> Perangkat ESP32</h2>
+        </div>
+        <div className="settings-card__body">
+          <div className="esp-reset-section">
+            <div className="esp-reset__info">
+              <h3>Reset Perangkat</h3>
+              <p>
+                Mengirim perintah restart ke perangkat ESP32 fingerprint scanner.
+                Gunakan jika perangkat tidak merespons atau mengalami kendala.
+              </p>
+              <div className="esp-reset__warning">
+                <LuRefreshCw />
+                <span>Perangkat akan mati selama beberapa detik saat proses restart.</span>
+              </div>
+            </div>
+
+            {!showResetConfirm ? (
+              <button
+                className="btn btn--danger btn--reset-esp"
+                onClick={() => setShowResetConfirm(true)}
+              >
+                <LuRotateCcw /> Reset ESP32
+              </button>
+            ) : (
+              <div className="esp-reset__confirm">
+                <div className="esp-reset__confirm-box">
+                  <LuRefreshCw className="esp-reset__confirm-icon" />
+                  <p>Yakin ingin me-reset perangkat ESP32?</p>
+                  <p className="text-muted">Proses absensi akan terhenti sementara.</p>
+
+                  {resetStatus === 'success' && (
+                    <div className="alert alert--success" style={{ marginTop: '12px' }}>
+                      <LuWifi /> Perintah reset berhasil dikirim! ESP32 akan restart.
+                    </div>
+                  )}
+                  {resetStatus === 'error' && (
+                    <div className="alert alert--danger" style={{ marginTop: '12px' }}>
+                      <LuWifiOff /> Gagal mengirim — pastikan MQTT terhubung.
+                    </div>
+                  )}
+
+                  <div className="form-actions" style={{ justifyContent: 'center', borderTop: 'none', paddingTop: '12px' }}>
+                    <button
+                      className="btn btn--secondary"
+                      onClick={() => { setShowResetConfirm(false); setResetStatus(null); }}
+                      disabled={resetStatus === 'sending'}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      className="btn btn--danger"
+                      onClick={handleResetESP}
+                      disabled={resetStatus === 'sending' || resetStatus === 'success'}
+                    >
+                      {resetStatus === 'sending' ? (
+                        <><LuRotateCcw className="spin" /> Mengirim...</>
+                      ) : resetStatus === 'success' ? (
+                        <><LuCheck /> Terkirim!</>
+                      ) : (
+                        <><LuRotateCcw /> Ya, Reset Sekarang</>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 5: Mode Pengembang / Debug ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuTerminal /> Mode Pengembang & Debug</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">Fitur lanjutan untuk melihat laporan error sistem dan men-debug aplikasi saat terjadi masalah.</p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', backgroundColor: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <div>
+                <strong style={{ display: 'block', marginBottom: '4px', color: 'var(--text-primary)' }}>Tampilkan Tombol Debug</strong>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Memunculkan tombol untuk mengambil snapshot log error.</span>
+              </div>
+              <button
+                onClick={toggleDebugMode}
+                style={{
+                  width: '50px',
+                  height: '26px',
+                  borderRadius: '13px',
+                  backgroundColor: debugMode ? '#10b981' : '#d1d5db',
+                  border: 'none',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.3s'
+                }}
+              >
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: '#fff',
+                  position: 'absolute',
+                  top: '2px',
+                  left: debugMode ? '26px' : '2px',
+                  transition: 'left 0.3s',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                }} />
+              </button>
+            </div>
+
+            <button className="btn btn--secondary" onClick={() => setIsLogViewerOpen(true)} style={{ width: '100%', justifyContent: 'center' }}>
+              <LuExternalLink /> Lihat Daftar Log Laporan Debug
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Log Viewer */}
+      <DebugLogsViewer isOpen={isLogViewerOpen} onClose={() => setIsLogViewerOpen(false)} />
+    </div>
+  );
+}

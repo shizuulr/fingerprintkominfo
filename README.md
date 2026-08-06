@@ -14,6 +14,8 @@ SIAP (*Sistem Informasi Absensi PKL*) adalah aplikasi web manajemen absensi real
   - **SIDEDI (Sistem Desa Digital)**: Penempatan magang di desa-desa dengan konfirmasi kehadiran manual & progres pekerjaan.
 - **Manajemen Peserta & Pendaftaran Fingerprint**: Input data peserta dan proses registrasi sidik jari ke ESP32 secara nirkabel.
 - **Cetak Laporan & Kop Surat Resmi**: Fitur ekspor laporan absensi (global dan individual) lengkap dengan Kop Surat resmi Dinas Kominfo Kabupaten Temanggung.
+- **Pengaturan & Tampilan**: Modul pengaturan yang mencakup opsi Mode Gelap (Dark Mode), penyesuaian ukuran font dinamis, kendali *Remote Reset* untuk perangkat ESP32 via MQTT, **Konfigurasi Jaringan WiFi ESP32** secara dinamis (Mode Jaringan HTTP & Mode Kabel WebSerial API), serta **Mode Pengembang & Log Viewer System** (dengan Eruda console dan pemantauan error otomatis).
+- **Integrasi Hari Libur Dinamis & Agenda**: Sinkronisasi tanggal merah dan cuti bersama secara otomatis via API serta pengelolaan agenda hari penting.
 - **Auto-Recovery & Background Workers**: Pemrosesan scan dan pemulihan data pendaftaran secara otomatis via background listener.
 
 ---
@@ -81,4 +83,4 @@ npm run build
 
 ## 📖 Dokumentasi Lengkap
 
-Untuk dokumentasi teknis mendalam mengenai skema database Firestore, alur komunikasi MQTT, spesifikasi firmware ESP32, aturan bisnis jam kerja, dan arsitektur komponen, silakan baca **[DOCUMENTATION.md](file:///c:/kuliah/lainya/semangat%20kp/aplikasi%20absensi/DOCUMENTATION.md)**.
+Untuk dokumentasi teknis mendalam mengenai skema database Firestore, alur komunikasi MQTT, spesifikasi firmware ESP32, aturan bisnis jam kerja, dan arsitektur komponen, silakan baca **[DOCUMENTATION.md](DOCUMENTATION.md)**.

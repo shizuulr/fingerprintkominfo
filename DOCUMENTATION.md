@@ -24,6 +24,9 @@ Dinas Komunikasi dan Informatika, Kabupaten Temanggung · 2026
 15. [Routing](#15-routing)
 16. [Known Issues & Bug Tracking](#16-known-issues--bug-tracking)
 17. [Scripts & Perintah](#17-scripts--perintah)
+18. [Fitur: Retained Delete Message MQTT](#18-fitur-retained-delete-message-mqtt)
+19. [Fitur: Tombol Reset Manual ESP32 (GPIO 4)](#19-fitur-tombol-reset-manual-esp32-gpio-4)
+20. [Riwayat Pembaruan Terakhir (Agustus 2026)](#20-riwayat-pembaruan-terakhir-agustus-2026)
 
 ---
 
@@ -48,10 +51,10 @@ Sistem ini terintegrasi langsung dengan perangkat keras (ESP32) menggunakan prot
 │  │Dashboard │  │UserManagement│  │SidediInternship │  │
 │  └──────────┘  └──────────────┘  └─────────────────┘  │
 │  ┌───────────────┐  ┌─────────────────────────────┐   │
-│  │AttendanceHist.│  │ScanProcessor (background)   │   │
+│  │AttendanceHist.│  │Settings (Pengaturan)        │   │
 │  └───────────────┘  └─────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │      MqttListener (background, global)           │  │
+│  │      ScanProcessor & MqttListener (background)   │  │
 │  └──────────────────────────────────────────────────┘  │
 └────────────┬──────────────────────┬────────────────────┘
              │ Firestore SDK        │ MQTT over WSS
@@ -297,6 +300,20 @@ Penyimpanan opsi pilihan dinamis untuk Jurusan dan Pembimbing pada form pendafta
 - `majors`: `{ name: String }`
 - `advisors`: `{ name: String }`
 
+### 7.8. Koleksi `system_debug_logs`
+Menyimpan snapshot log dari perangkat saat admin/pengembang mendeteksi masalah aplikasi (*crash*, *disconnect*, dll).
+
+| Field | Tipe Data | Keterangan |
+|---|---|---|
+| `timestamp` | Timestamp | Waktu pengiriman laporan error/log dari klien |
+| `localTime` | String | Format ISO String waktu dari peramban pengguna saat error terjadi |
+| `userAgent` | String | Informasi sistem operasi dan peramban pengirim |
+| `deviceType` | String | Deteksi tipe perangkat (`Mobile` / `Desktop`) |
+| `onlineStatus` | String | Status jaringan internet browser (`Online` / `Offline`) |
+| `mqttStatus` | String | Status koneksi Web SPA ke broker MQTT (`CONNECTED`, `DISCONNECTED`, `READING`) |
+| `fingerprintStatus` | String | Status hardware pemindai sidik jari |
+| `lastError` | Object \| null | Detail *stack trace* dan pesan error terakhir (jika terjadi error JS) |
+
 ---
 
 ## 8. Alur Data & Komunikasi
@@ -364,6 +381,15 @@ Penyimpanan opsi pilihan dinamis untuk Jurusan dan Pembimbing pada form pendafta
 - **Penjadwalan Tugas**: Mengatur jadwal keberangkatan peserta ke lokasi desa SIDEDI per tanggal.
 - **Konfirmasi Manual Attendance**: Memfasilitasi konfirmasi absensi peserta SIDEDI yang tidak menggunakan fingerprint fisik.
 
+### 9.5. Pengaturan (`/pengaturan`)
+- **Tampilan Tema**: Konfigurasi Mode Cerah (Light Mode) dan Mode Gelap (Dark Mode) secara global.
+- **Ukuran Font**: Pilihan ukuran teks (Kecil, Sedang, Besar) untuk aksesibilitas, dengan fitur *live preview*.
+- **Koneksi WiFi ESP32**: Fitur untuk mengganti konfigurasi jaringan (SSID dan Password) yang digunakan oleh ESP32. Memiliki dua mode komunikasi canggih:
+  - **Mode Jaringan (HTTP POST)**: Mengganti WiFi melalui HTTP Request ke alamat IP ESP32.
+  - **Mode Kabel (WebSerial API)**: Konfigurasi nirkontak langsung melalui kabel USB di browser tanpa perlu *Internet* atau *Serial Monitor*.
+- **Reset ESP32 (MQTT)**: Opsi untuk merestart perangkat keras ESP32 dari jarak jauh jika terjadi kendala operasional, dilengkapi dengan notifikasi status keberhasilan pengiriman perintah.
+- **Mode Pengembang & Debug**: Fitur lanjutan yang memungkinkan admin memunculkan tombol *floating debug* dan membuka *Log Viewer* Modal untuk memantau, menganalisis, serta menerjemahkan pesan kerusakan (error) ke bahasa manusia secara otomatis.
+
 ---
 
 ## 10. Komponen
@@ -405,6 +431,16 @@ Penyimpanan opsi pilihan dinamis untuk Jurusan dan Pembimbing pada form pendafta
 - `addParticipantToSidedi()` / `removeParticipantFromSidedi()`: Penugasan anggota ke desa.
 - `saveSchedule()` & `getTodaySchedules(date)`: Pengelolaan jadwal penugasan harian.
 
+### 11.4. `holidayService.js`
+- `syncHolidays(year)`: Mengambil daftar tanggal merah dari API eksternal dinamis (`APIHariLibur_V2`) dan menyimpannya (caching) ke Firestore untuk meminimalkan *API call*.
+- `getDayType(dateStr)`: Fungsi sentral penentu hari libur nasional, libur khusus/agenda (termasuk cuti bersama), akhir pekan (Sabtu/Minggu), atau hari kerja normal.
+
+### 11.5. `debugService.js`
+- `initGlobalErrorHandler()`: Memonitor error tak tertangani (`onerror`, `onunhandledrejection`) pada sesi aplikasi yang berjalan.
+- `sendDebugSnapshot()`: Mengumpulkan data vital (koneksi, MQTT, UserAgent) lalu mengirimkannya ke koleksi `system_debug_logs`.
+- `analyzeDebugLog(logData)`: Menerjemahkan data teknis dan *stack trace* menjadi panduan (*warning* / *error* / *success*) berbahasa Indonesia.
+- `toggleEruda()`: Memuat *in-app DevTools Console* (`eruda`) secara *lazy-load* saat dibutuhkan (khusus debugging).
+
 ---
 
 ## 12. Firmware ESP32 (Hardware)
@@ -423,6 +459,7 @@ Firmware ESP32 berada pada folder `/absensi_pkl_hcsr04_buzzer_led__1_/absensi_pk
 2. **Scan Mode (Default)**: Membaca sidik jari yang ditempelkan. Jika ID cocok, ESP32 mempublish JSON `{ "fingerprintId": ID }` ke topik `scan` dan membunyikan buzzer 1x.
 3. **Enroll Mode**: Menerima pesan MQTT dari `enroll_request`. ESP32 meminta penempelan jari pertama dan kedua untuk verifikasi kecocokan gambar. Jika sukses, menyimpan ke EEPROM sensor AS608 dan mempublish balasan ke `enroll_result`.
 4. **Delete / Clear Mode**: Menerima perintah dari `delete_request` untuk menghapus 1 ID atau mengosongkan seluruh memori sensor AS608 (`ALL`).
+5. **WiFi Configuration Mode (WebServer & WebSerial)**: Menangani pergantian WiFi. Mengoperasikan WebServer pada port 80 untuk menerima `HTTP POST /save` dengan dukungan `CORS`, serta *Serial Listener* secara non-blocking di `loop()` untuk menerima perintah format CSV `SSID,PASS\n`.
 
 ---
 
@@ -441,8 +478,9 @@ Firmware ESP32 berada pada folder `/absensi_pkl_hcsr04_buzzer_led__1_/absensi_pk
 | `absensipkl_temanggung_2026/enroll_result` | ESP32 ➔ Web SPA | `{"docId": "abc123", "success": true, "fingerprintId": 5}` | Balasan status hasil enroll dari ESP32. |
 | `absensipkl_temanggung_2026/delete_request` | Web SPA ➔ ESP32 | `{"fingerprintId": 5}` atau `{"fingerprintId": "ALL"}` | Perintah hapus sidik jari tertentu / reset total. |
 | `absensipkl_temanggung_2026/delete_result` | ESP32 ➔ Web SPA | `{"fingerprintId": 5, "success": true}` | Balasan hasil penghapusan sidik jari. |
+| `absensipkl_temanggung_2026/reset_request` | Web SPA ➔ ESP32 | `{"action": "restart", "timestamp": 1690000000}` | Perintah khusus untuk merestart module ESP32 (Remote Reset). |
 
----
+--- 
 
 ## 14. Aturan Bisnis Absensi
 
@@ -477,6 +515,7 @@ Aplikasi menggunakan `react-router-dom` v7.
 | `/peserta` | `<UserManagement />` | Kelola peserta, enroll sidik jari, cetak laporan individu. |
 | `/riwayat` | `<AttendanceHistory />` | Log riwayat absensi terfilter rentang tanggal. |
 | `/magang-sidedi` | `<SidediInternship />` | Manajemen lokasi desa SIDEDI, penjadwalan & penugasan. |
+| `/pengaturan` | `<Settings />` | Konfigurasi tema visual, ukuran font, dan remote reset ESP32. |
 
 ---
 
@@ -501,4 +540,115 @@ Aplikasi menggunakan `react-router-dom` v7.
 | `npm run lint` | Menjalankan pemindaian linter dengan `oxlint`. |
 | `npm run test` | Menjalankan seluruh pengujian unit secara sekali jalan (`vitest run`). |
 | `npm run test:watch` | Menjalankan unit test Vitest dalam mode watch interaktif. |
+
+---
+
+## 18. Fitur: MQTT Retained Delete (Auto-Sync saat ESP32 Boot)
+
+### Latar Belakang Masalah
+
+Ketika admin menghapus data peserta dari dashboard web saat ESP32 **sedang mati / reboot**, perintah hapus dikirim via MQTT tetapi tidak ada penerima. Akibatnya:
+
+- Data peserta terhapus dari Firebase ✓
+- Template sidik jari di sensor AS608 **tidak terhapus** ✗
+- Slot ID lama masih dianggap "terpakai" oleh ESP32 ✗
+- Scan sidik jari orang yang sama akan cocok ke ID lama ✗
+
+### Solusi: MQTT Retained Message
+
+Perintah hapus (`delete_request`) kini dikirim dengan flag **`retain: true`** dan **`qos: 1`**. Broker HiveMQ menyimpan pesan ini secara permanen hingga dikonfirmasi selesai diproses.
+
+**Alur kerja:**
+
+```
+Admin klik "Hapus User" / "Hapus Semua" (ESP32 sedang reboot)
+  │
+  ▼
+Web publish ke topic delete_request
+  { fingerprintId: X }  ←  retain: true, qos: 1
+  │
+  ▼
+HiveMQ Broker menyimpan pesan (retained) ─────────────────────────┐
+                                                                    │
+ESP32 selesai boot → connect MQTT → subscribe delete_request       │
+  ◄──── Broker langsung kirim retained message ────────────────────┘
+  │
+  ▼
+onMqttMessage() → prosesHapusTemplate(X) atau prosesHapusSemua()
+  → finger.deleteModel(X) / finger.emptyDatabase()
+  → slotTerpakai[X] = false
+  → kirim delete_result { success: true }
+  │
+  ▼
+Web terima delete_result sukses
+  → publish('', retain: true) ke delete_request ← hapus retained di broker
+  → Firebase dihapus
+```
+
+### File yang Diubah
+
+| File | Fungsi | Perubahan |
+|---|---|---|
+| `src/components/MqttListener.jsx` | `publishDeleteRequest()` | Tambah `{ retain: true, qos: 1 }` |
+| `src/components/MqttListener.jsx` | `publishClearAllRequest()` | Tambah `{ retain: true, qos: 1 }` |
+| `src/components/MqttListener.jsx` | `handleDeleteResult()` | Clear retained setelah konfirmasi sukses |
+
+### Catatan
+
+- HiveMQ hanya menyimpan **1 retained message per topic**. Untuk hapus banyak user saat ESP32 offline, gunakan **Hapus Semua** (`fingerprintId: "ALL"`) yang lebih andal.
+- **Tidak ada perubahan firmware ESP32** — mekanisme existing sudah cukup menangani retained message.
+
+---
+
+## 19. Fitur: Tombol Reset Manual ESP32 (GPIO 4)
+
+### Deskripsi
+
+Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart* perangkat tanpa perlu cabut-colok daya atau akses Serial Monitor. Berguna saat sistem hang atau tidak merespons.
+
+### Spesifikasi Hardware
+
+| Parameter | Nilai |
+|---|---|
+| GPIO | 4 |
+| Wiring | Push button → GPIO 4 → GND |
+| Mode | `INPUT_PULLUP` (aktif LOW) |
+| Konflik pin | Tidak ada (aman) |
+
+### Perilaku
+
+1. Tombol ditekan → LCD tampil `Reset Manual / Mohon tunggu...`
+2. Buzzer berbunyi selama **1500 ms**
+3. Buzzer mati → `ESP.restart()` dipanggil
+4. ESP32 reboot penuh — **data sidik jari di AS608 tidak terhapus**
+5. Setelah boot: `sinkronisasiSlotDariSensor()` otomatis rebuild cache dari sensor
+
+### File yang Diubah
+
+| File | Lokasi | Perubahan |
+|---|---|---|
+| `esp32_fix/esp32_fix.ino` | Deklarasi pin | Tambah `#define RESET_BUTTON_PIN 4` |
+| `esp32_fix/esp32_fix.ino` | `setupTambahanHardware()` | Tambah `pinMode(RESET_BUTTON_PIN, INPUT_PULLUP)` |
+| `esp32_fix/esp32_fix.ino` | `loop()` — awal fungsi | Tambah blok cek `digitalRead(RESET_BUTTON_PIN) == LOW` |
+
+---
+
+## 20. Riwayat Pembaruan Terakhir (Agustus 2026)
+
+### 20.1. Fitur Debugging & Log Viewer Sistem
+- **Latar Belakang**: Memudahkan pelacakan masalah/error pada perangkat PC maupun Mobile saat digunakan di lapangan tanpa memerlukan koneksi kabel debugging.
+- **Implementasi Utama**:
+  - **`src/services/debugService.js`**: Menangkap error JavaScript global (`window.onerror` & `onunhandledrejection`), mengabaikan *benign* `AbortError` (`event.preventDefault()`), mengintegrasikan Eruda Console secara dinamis dari CDN, serta mengirimkan snapshot kondisi sistem ke Firestore koleksi `system_debug_logs`.
+  - **`src/components/DebugButton.jsx`**: Tombol melayang di pojok kanan bawah dengan notifikasi *toast* untuk mengambil snapshot dan memuat Eruda.
+  - **`src/components/DebugLogsViewer.jsx`**: Jendela dialog (Modal) untuk membaca daftar laporan snapshot di Firestore dan menerjemahkan masalah (*Stack Trace*, status MQTT/Fingerprint, koneksi internet) ke bahasa Indonesia secara otomatis via fungsi `analyzeDebugLog`.
+  - **`src/pages/Settings.jsx`**: Penambahan segmen "Mode Pengembang & Debug" yang dilengkapi *toggle switch* (On/Off) untuk mengontrol visibilitas tombol debug dan membuka Log Viewer.
+
+### 20.2. Migrasi Hari Libur & Penjadwalan Agenda Dinamis
+- **Latar Belakang**: Mengganti data tanggal merah statis menjadi dinamis dan fleksibel.
+- **Implementasi Utama**:
+  - **`src/services/holidayService.js`**: Mengintegrasikan API eksternal `guangrei/APIHariLibur_V2` untuk sinkronisasi otomatis tanggal merah dan cuti bersama ke Firestore.
+  - **`src/pages/SidediInternship.jsx`**: Penambahan fitur "Agenda Hari" pada tab Penjadwalan SIDEDI, memungkinkan admin menambahkan penanda hari penting/libur kustom beserta kategorinya.
+
+### 20.3. Pembersihan Antarmuka (Clean UI)
+- **Pembersihan Emotikon**: Mengeliminasi penggunaan simbol emoji berlebih (seperti 🐛 pada tombol debug dan 🤒/🏫/📋 pada badge status izin `StatusBadge.jsx`) agar tampilan antarmuka terkesan lebih bersih, resmi, dan profesional.
 

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck } from 'react-icons/lu';
-import { subscribeToTodayAttendance, getTodayDate, isFriday, isOffDay, deleteAttendanceLog, confirmSidediAttendance, getAttendanceByDateRange, submitLeavePermission } from '../services/attendanceService';
+import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck, LuSettings, LuRefreshCw, LuCalendarDays } from 'react-icons/lu';
+import { subscribeToTodayAttendance, getTodayDate, isFriday, isOffDay, deleteAttendanceLog, confirmSidediAttendance, getAttendanceByDateRange, submitLeavePermission, submitTemporaryExit, submitTemporaryReturn, getAttendanceStatus } from '../services/attendanceService';
 import { getActiveUsers } from '../services/userService';
 import { getTodaySchedules } from '../services/sidediService';
 import StatsCard from '../components/StatsCard';
 import StatusBadge from '../components/StatusBadge';
+import { getDayType, syncHolidays, getCachedHolidays } from '../services/holidayService';
 
 export default function Dashboard() {
   const [attendance, setAttendance] = useState([]);
@@ -12,6 +13,10 @@ export default function Dashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidediSchedules, setSidediSchedules] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
+
+  // Holiday / Special Schedule States
+  const [dayType, setDayType] = useState('normal'); // 'weekend' | 'libur_nasional' | 'normal'
+  const [holidayName, setHolidayName] = useState('');
 
   // Print Global Modal States
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -43,7 +48,32 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, []);
 
-  // Get total active users and today's sidedi schedules
+  const fetchDayStatus = async () => {
+    try {
+      const todayStr = getTodayDate();
+      const type = await getDayType(todayStr);
+      setDayType(type);
+
+      let holidays = await getCachedHolidays();
+      const currentYear = new Date().getFullYear();
+      const hasThisYear = holidays.some(h => h.tanggal && h.tanggal.startsWith(String(currentYear)));
+      if (!hasThisYear) {
+        try {
+          await syncHolidays(currentYear);
+          holidays = await getCachedHolidays();
+        } catch (syncErr) {
+          console.warn('Auto-sync holidays failed:', syncErr);
+        }
+      }
+
+      const todayHoliday = holidays.find(h => h.tanggal === todayStr);
+      setHolidayName(todayHoliday ? todayHoliday.keterangan : '');
+    } catch (err) {
+      console.error('Error fetching day status:', err);
+    }
+  };
+
+  // Get total active users, today's sidedi schedules and day status
   useEffect(() => {
     const fetchUsersAndSchedules = async () => {
       try {
@@ -59,7 +89,8 @@ export default function Dashboard() {
       }
     };
     fetchUsersAndSchedules();
-  }, []);
+    fetchDayStatus();
+  }, [attendance]);
 
   // Calculate statistics
   const izinCount = attendance.filter((a) => a.location === 'izin').length;
@@ -91,7 +122,8 @@ export default function Dashboard() {
 
   const getDayLabel = () => {
     const now = new Date();
-    if (isOffDay(now)) return '🔴 Hari Libur';
+    if (dayType === 'weekend') return '🔴 Akhir Pekan (LIBUR)';
+    if (dayType === 'libur_nasional') return `🔴 Libur Nasional: ${holidayName || 'Hari Libur'}`;
     if (isFriday(now)) return '🟢 Jumat (Keluar 14:30)';
     return '🟢 Hari Kerja (Keluar 16:00)';
   };
@@ -110,6 +142,29 @@ export default function Dashboard() {
         await deleteAttendanceLog(id);
       } catch (err) {
         alert('Gagal menghapus data absensi: ' + err.message);
+      }
+    }
+  };
+
+  const handleTemporaryExit = async (logId) => {
+    const note = window.prompt('Masukkan alasan izin keluar sementara (opsional):');
+    if (note !== null) {
+      try {
+        const res = await submitTemporaryExit(logId, note.trim());
+        alert(res.message);
+      } catch (err) {
+        alert('Gagal izin keluar sementara: ' + err.message);
+      }
+    }
+  };
+
+  const handleTemporaryReturn = async (logId) => {
+    if (window.confirm('Apakah Anda yakin ingin mencatat kepulangan dari izin keluar sementara?')) {
+      try {
+        const res = await submitTemporaryReturn(logId);
+        alert(res.message);
+      } catch (err) {
+        alert('Gagal mencatat kepulangan dari izin: ' + err.message);
       }
     }
   };
@@ -314,48 +369,70 @@ export default function Dashboard() {
           <h1 className="page-title">Dashboard Absensi</h1>
           <p className="page-subtitle">{formatDate(currentTime)} — {getDayLabel()}</p>
         </div>
-        <div className="live-clock">
-          <button className="btn btn--secondary" onClick={() => setShowPrintModal(true)} style={{ marginRight: '15px' }}>
-            <LuPrinter style={{ marginRight: '8px' }} /> Rekap Global
+        <div className="live-clock" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button className="btn btn--secondary" onClick={() => setShowPrintModal(true)}>
+            <LuPrinter style={{ marginRight: '8px' }} /> Ringkasan
           </button>
           <span className="live-clock__dot"></span>
           <span className="live-clock__time">{formatTime(currentTime)}</span>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-grid">
-        <StatsCard
-          icon={<LuUserCheck />}
-          label="Hadir Tepat Waktu"
-          value={stats.hadir}
-          color="success"
-        />
-        <StatsCard
-          icon={<LuClock />}
-          label="Terlambat"
-          value={stats.terlambat}
-          color="warning"
-        />
-        <StatsCard
-          icon={<LuUserX />}
-          label="Belum Masuk"
-          value={stats.belumMasuk < 0 ? 0 : stats.belumMasuk}
-          color="danger"
-        />
-        <StatsCard
-          icon={<LuLogOut />}
-          label="Sudah Keluar"
-          value={stats.sudahKeluar}
-          color="info"
-        />
-        <StatsCard
-          icon={<LuShieldCheck />}
-          label="Izin"
-          value={stats.izin}
-          color="primary"
-        />
-      </div>
+      {/* Info Libur Nasional */}
+      {dayType === 'libur_nasional' && (
+        <div className="card" style={{ marginBottom: '20px', borderLeft: '4px solid #ef4444', padding: '16px', background: 'rgba(239, 68, 68, 0.1)' }}>
+          <h3 style={{ color: '#ef4444', margin: 0, fontSize: '16px', fontWeight: 'bold' }}>🔴 HARI LIBUR NASIONAL / CUTI BERSAMA ASN</h3>
+          <p style={{ color: 'var(--text-secondary)', margin: '8px 0 0 0', fontSize: '14px' }}>
+            Hari ini tanggal <strong>{formatDate(currentTime)}</strong> adalah hari libur nasional: <strong>{holidayName || 'Cuti Bersama'}</strong>. Rekapitulasi utama dinonaktifkan, namun pencatatan kehadiran (D/K) tetap dapat dilakukan.
+          </p>
+        </div>
+      )}
+
+      {/* Info Weekend */}
+      {dayType === 'weekend' ? (
+        <div className="card" style={{ padding: '40px 20px', textAlign: 'center', borderLeft: '4px solid #9ca3af', background: 'rgba(156, 163, 175, 0.1)', marginBottom: '20px' }}>
+          <h2 style={{ color: 'var(--text-primary)', fontSize: '24px', fontWeight: 'bold', margin: '0 0 10px 0' }}>🔴 LIBUR AKHIR PEKAN</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '16px', margin: 0 }}>
+            Tidak ada aktivitas absensi di akhir pekan (Sabtu & Minggu). Dashboard dan pencatatan absensi dinonaktifkan.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards (Hidden on weekend and national holidays) */}
+          {dayType !== 'libur_nasional' && (
+            <div className="stats-grid">
+              <StatsCard
+                icon={<LuUserCheck />}
+                label="Hadir Tepat Waktu"
+                value={stats.hadir}
+                color="success"
+              />
+              <StatsCard
+                icon={<LuClock />}
+                label="Terlambat"
+                value={stats.terlambat}
+                color="warning"
+              />
+              <StatsCard
+                icon={<LuUserX />}
+                label="Belum Masuk"
+                value={stats.belumMasuk < 0 ? 0 : stats.belumMasuk}
+                color="danger"
+              />
+              <StatsCard
+                icon={<LuLogOut />}
+                label="Sudah Keluar"
+                value={stats.sudahKeluar}
+                color="info"
+              />
+              <StatsCard
+                icon={<LuShieldCheck />}
+                label="Izin"
+                value={stats.izin}
+                color="primary"
+              />
+            </div>
+          )}
 
       {/* Konfirmasi Magang SIDEDI */}
       {unconfirmedSidediUsers.length > 0 && (
@@ -508,21 +585,59 @@ export default function Dashboard() {
                             Ket: {item.leaveNote}
                           </span>
                         )}
+                        {item.izin_sementara && item.izin_sementara.length > 0 && (
+                          <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            {item.izin_sementara.map((iz, idx) => (
+                              <span key={idx} style={{ fontSize: '10px', color: 'var(--color-primary-light)', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 4px', borderRadius: '2px', display: 'inline-block' }}>
+                                ↪️ Keluar: {iz.jam_keluar} {iz.jam_kembali ? `| Kembali: ${iz.jam_kembali}` : '(Belum Kembali)'}
+                                {iz.keterangan && ` (${iz.keterangan})`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td>{formatTime(item.checkIn)}</td>
                     <td>{item.checkOut ? formatTime(item.checkOut) : <span className="text-muted">—</span>}</td>
                     <td>
-                      <StatusBadge status={item.checkOut ? item.status : (item.checkIn ? 'Belum Absen Keluar' : item.status)} />
+                      <StatusBadge status={getAttendanceStatus(item)} />
                     </td>
                     <td>
-                      <button
-                        className="btn btn--icon btn--delete"
-                        onClick={() => handleDelete(item.id, item.userName)}
-                        title="Hapus Absen"
-                      >
-                        <LuTrash2 />
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {item.checkIn && !item.checkOut && item.location !== 'izin' && (() => {
+                          const hasActiveExit = item.izin_sementara && item.izin_sementara.length > 0 && item.izin_sementara[item.izin_sementara.length - 1].jam_kembali === null;
+                          if (hasActiveExit) {
+                            return (
+                              <button
+                                className="btn"
+                                onClick={() => handleTemporaryReturn(item.id)}
+                                style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#10b981', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+                                title="Catat Kembali dari Izin Keluar Sementara"
+                              >
+                                Kembali
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <button
+                                className="btn"
+                                onClick={() => handleTemporaryExit(item.id)}
+                                style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#f59e0b', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+                                title="Izin Keluar Sementara"
+                              >
+                                Keluar
+                              </button>
+                            );
+                          }
+                        })()}
+                        <button
+                          className="btn btn--icon btn--delete"
+                          onClick={() => handleDelete(item.id, item.userName)}
+                          title="Hapus Absen"
+                        >
+                          <LuTrash2 />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -531,6 +646,11 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+        </>
+      )}
+
+
 
       {/* Modal Cetak Rekap */}
       {showPrintModal && (

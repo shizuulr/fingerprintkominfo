@@ -7,11 +7,13 @@ import {
   updateDoc,
   doc,
   getDocs,
+  getDoc,
   orderBy,
   Timestamp,
   deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { getDayType } from './holidayService';
 
 const ATTENDANCE_COLLECTION = 'attendance_logs';
 
@@ -111,15 +113,28 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
   const now = new Date();
   const today = getTodayDate();
 
-  // Cek hari libur
-  if (isOffDay(now)) {
-    return { success: false, message: 'Hari ini adalah hari libur (Sabtu/Minggu)' };
+  // Cek tipe hari (weekend tidak diizinkan sama sekali)
+  const dayType = await getDayType(today);
+  if (dayType === 'weekend') {
+    return { success: false, message: 'Hari ini adalah hari libur akhir pekan (Sabtu/Minggu), absensi tidak diizinkan.' };
+  }
+
+  // Ambil snapshot data user dari database
+  let userSnapshotData = {};
+  try {
+    const userQuery = query(collection(db, 'users'), where('fingerprintId', '==', Number(fingerprintId)));
+    const userSnapshot = await getDocs(userQuery);
+    if (!userSnapshot.empty) {
+      userSnapshotData = userSnapshot.docs[0].data();
+    }
+  } catch (err) {
+    console.error('Error fetching user snapshot for attendance log:', err);
   }
 
   // Cek apakah sudah ada record hari ini untuk fingerprint ini
   const q = query(
     collection(db, ATTENDANCE_COLLECTION),
-    where('fingerprintId', '==', fingerprintId),
+    where('fingerprintId', '==', Number(fingerprintId)),
     where('date', '==', today)
   );
 
@@ -132,9 +147,15 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
     const finalStatus = status === 'Hadir' ? 'Hadir (KOMINFO)' : 'Terlambat (KOMINFO)';
     
     await addDoc(collection(db, ATTENDANCE_COLLECTION), {
-      fingerprintId,
-      userName,
-      division,
+      fingerprintId: Number(fingerprintId),
+      userName: userSnapshotData.name || userName,
+      division: userSnapshotData.division || division,
+      institution: userSnapshotData.institution || '',
+      major: userSnapshotData.major || '',
+      advisor: userSnapshotData.advisor || '',
+      no_hp_pembimbing: userSnapshotData.no_hp_pembimbing || '',
+      startDate: userSnapshotData.startDate || '',
+      endDate: userSnapshotData.endDate || '',
       date: today,
       checkIn: Timestamp.fromDate(now),
       checkOut: isAfternoon ? Timestamp.fromDate(now) : null,
@@ -189,6 +210,24 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
 export const confirmSidediAttendance = async (fingerprintId, userName, division = '', progress = 0) => {
   const today = getTodayDate();
 
+  // Cek tipe hari (weekend tidak diizinkan sama sekali)
+  const dayType = await getDayType(today);
+  if (dayType === 'weekend') {
+    return { success: false, message: 'Hari ini adalah akhir pekan (Sabtu/Minggu), absensi tidak diizinkan.' };
+  }
+
+  // Ambil snapshot data user dari database
+  let userSnapshotData = {};
+  try {
+    const userQuery = query(collection(db, 'users'), where('fingerprintId', '==', Number(fingerprintId)));
+    const userSnapshot = await getDocs(userQuery);
+    if (!userSnapshot.empty) {
+      userSnapshotData = userSnapshot.docs[0].data();
+    }
+  } catch (err) {
+    console.error('Error fetching user snapshot for Sidedi attendance log:', err);
+  }
+
   // Set default checkIn (07:00) and checkOut (16:00) for Sidedi attendance
   const checkInTime = new Date();
   checkInTime.setHours(7, 0, 0, 0);
@@ -207,8 +246,14 @@ export const confirmSidediAttendance = async (fingerprintId, userName, division 
   if (snapshot.empty) {
     await addDoc(collection(db, ATTENDANCE_COLLECTION), {
       fingerprintId: Number(fingerprintId),
-      userName,
-      division,
+      userName: userSnapshotData.name || userName,
+      division: userSnapshotData.division || division,
+      institution: userSnapshotData.institution || '',
+      major: userSnapshotData.major || '',
+      advisor: userSnapshotData.advisor || '',
+      no_hp_pembimbing: userSnapshotData.no_hp_pembimbing || '',
+      startDate: userSnapshotData.startDate || '',
+      endDate: userSnapshotData.endDate || '',
       date: today,
       checkIn: Timestamp.fromDate(checkInTime),
       checkOut: Timestamp.fromDate(checkOutTime),
@@ -295,6 +340,18 @@ export const submitLeavePermission = async (fingerprintId, userName, division = 
     return { success: false, message: 'Peserta sudah memiliki catatan absensi hari ini.' };
   }
 
+  // Ambil snapshot data user dari database
+  let userSnapshotData = {};
+  try {
+    const userQuery = query(collection(db, 'users'), where('fingerprintId', '==', Number(fingerprintId)));
+    const userSnapshot = await getDocs(userQuery);
+    if (!userSnapshot.empty) {
+      userSnapshotData = userSnapshot.docs[0].data();
+    }
+  } catch (err) {
+    console.error('Error fetching user snapshot for leave permission:', err);
+  }
+
   const leaveLabels = {
     'S': 'Sakit',
     'K': 'Panggilan Sekolah/Kampus',
@@ -305,8 +362,14 @@ export const submitLeavePermission = async (fingerprintId, userName, division = 
 
   await addDoc(collection(db, ATTENDANCE_COLLECTION), {
     fingerprintId: Number(fingerprintId),
-    userName,
-    division,
+    userName: userSnapshotData.name || userName,
+    division: userSnapshotData.division || division,
+    institution: userSnapshotData.institution || '',
+    major: userSnapshotData.major || '',
+    advisor: userSnapshotData.advisor || '',
+    no_hp_pembimbing: userSnapshotData.no_hp_pembimbing || '',
+    startDate: userSnapshotData.startDate || '',
+    endDate: userSnapshotData.endDate || '',
     date: today,
     checkIn: null,
     checkOut: null,
@@ -317,5 +380,71 @@ export const submitLeavePermission = async (fingerprintId, userName, division = 
   });
 
   return { success: true, message: `Izin ${statusLabel} berhasil dicatat untuk ${userName}.` };
+};
+
+export const submitTemporaryExit = async (logId, keterangan = '') => {
+  const docRef = doc(db, ATTENDANCE_COLLECTION, logId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    throw new Error('Log absensi tidak ditemukan.');
+  }
+  const data = docSnap.data();
+  const izinSebelumnya = data.izin_sementara || [];
+  const jamKeluar = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const updatedIzin = [...izinSebelumnya, { jam_keluar: jamKeluar, jam_kembali: null, keterangan }];
+  await updateDoc(docRef, { izin_sementara: updatedIzin });
+  return { success: true, message: 'Izin keluar sementara berhasil dicatat.' };
+};
+
+export const submitTemporaryReturn = async (logId) => {
+  const docRef = doc(db, ATTENDANCE_COLLECTION, logId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    throw new Error('Log absensi tidak ditemukan.');
+  }
+  const data = docSnap.data();
+  const izinSebelumnya = data.izin_sementara || [];
+  if (izinSebelumnya.length === 0) {
+    throw new Error('Tidak ada catatan izin keluar sementara hari ini.');
+  }
+  const updatedIzin = [...izinSebelumnya];
+  // Cari index terakhir yang jam_kembali masih null
+  const lastIndex = updatedIzin.map(item => item.jam_kembali).lastIndexOf(null);
+  if (lastIndex === -1) {
+    throw new Error('Semua izin keluar sementara sudah diselesaikan.');
+  }
+  const jamKembali = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  updatedIzin[lastIndex].jam_kembali = jamKembali;
+  await updateDoc(docRef, { izin_sementara: updatedIzin });
+  return { success: true, message: 'Kembali dari izin berhasil dicatat.' };
+};
+
+export const getAttendanceStatus = (item) => {
+  if (!item) return 'Alfa';
+  if (item.location === 'izin') {
+    return `Izin (${item.leaveType || 'I'})`;
+  }
+  if (item.checkIn && !item.checkOut) {
+    const today = getTodayDate();
+    const isPastDeadline = (() => {
+      if (item.date < today) return true;
+      if (item.date === today) {
+        const now = new Date();
+        const curHour = now.getHours();
+        const curMin = now.getMinutes();
+        if (curHour > 16 || (curHour === 16 && curMin >= 20)) {
+          return true;
+        }
+      }
+      return false;
+    })();
+
+    if (isPastDeadline) {
+      return 'Tidak Lengkap';
+    } else {
+      return 'Belum Absen Keluar';
+    }
+  }
+  return item.status || 'Hadir';
 };
 

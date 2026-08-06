@@ -556,8 +556,8 @@ describe('Preservation 7 — processAttendanceScan() untuk jari yang terdaftar',
     const result = await processAttendanceScan(5, 'Siti');
 
     const savedRecord = mockAddDoc.mock.calls[0][1];
-    expect(savedRecord.status).toBe('Hadir');
-    expect(result.status).toBe('Hadir');
+    expect(savedRecord.status).toBe('Hadir (KOMINFO)');
+    expect(result.status).toBe('Hadir (KOMINFO)');
 
     vi.useRealTimers();
   });
@@ -573,8 +573,8 @@ describe('Preservation 7 — processAttendanceScan() untuk jari yang terdaftar',
     const result = await processAttendanceScan(2, 'Ahmad Fauzi');
 
     const savedRecord = mockAddDoc.mock.calls[0][1];
-    expect(savedRecord.status).toBe('Terlambat');
-    expect(result.status).toBe('Terlambat');
+    expect(savedRecord.status).toBe('Terlambat (KOMINFO)');
+    expect(result.status).toBe('Terlambat (KOMINFO)');
 
     vi.useRealTimers();
   });

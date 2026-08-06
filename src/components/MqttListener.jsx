@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import mqtt from 'mqtt';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { setFingerprintStatus } from '../services/debugService';
 
 const MQTT_BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
 const TOPIC_SCAN = 'absensipkl_temanggung_2026/scan';
@@ -9,6 +10,7 @@ const TOPIC_ENROLL_REQUEST = 'absensipkl_temanggung_2026/enroll_request';
 const TOPIC_ENROLL_RESULT = 'absensipkl_temanggung_2026/enroll_result';
 const TOPIC_DELETE_REQUEST = 'absensipkl_temanggung_2026/delete_request';
 const TOPIC_DELETE_RESULT = 'absensipkl_temanggung_2026/delete_result';
+const TOPIC_RESET_REQUEST = 'absensipkl_temanggung_2026/reset_request';
 
 // Callback untuk meneruskan hasil delete_result ke komponen pemanggil
 let deleteResultCallback = null;
@@ -46,6 +48,7 @@ export default function MqttListener() {
 
     client.on('connect', () => {
       console.log('MQTT: terhubung ke broker HiveMQ');
+      setFingerprintStatus('CONNECTED');
       client.subscribe(TOPIC_SCAN);
       client.subscribe(TOPIC_ENROLL_RESULT);
       client.subscribe(TOPIC_DELETE_RESULT);
@@ -59,6 +62,7 @@ export default function MqttListener() {
         const data = JSON.parse(payloadStr);
 
         if (topic === TOPIC_SCAN) {
+          setFingerprintStatus('READING');
           await handleScanMessage(data);
         } else if (topic === TOPIC_ENROLL_RESULT) {
           await handleEnrollResult(data);
@@ -72,10 +76,32 @@ export default function MqttListener() {
 
     client.on('error', (err) => {
       console.error('MQTT: connection error', err);
+      setFingerprintStatus('DISCONNECTED');
     });
 
+    // Menangani masalah "Page entered Back-Forward Cache" & background throttling
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && clientRef.current && !clientRef.current.connected) {
+        console.log('MQTT: Tab aktif kembali, memaksa reconnect...');
+        clientRef.current.reconnect();
+      }
+    };
+    
+    const handlePageShow = (e) => {
+      if (e.persisted && clientRef.current && !clientRef.current.connected) {
+        console.log('MQTT: Halaman dipulihkan dari BFCache, memaksa reconnect...');
+        clientRef.current.reconnect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pageshow', handlePageShow);
+
     return () => {
-      client.end();
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pageshow', handlePageShow);
+      client.end(true); // force close untuk mencegah koneksi zombie saat React StrictMode / Hot-Reload
+      setFingerprintStatus('DISCONNECTED');
       window.mqttClient = null;
     };
   }, []);
@@ -125,6 +151,14 @@ async function handleEnrollResult(data) {
 function handleDeleteResult(data) {
   const { fingerprintId, success, error } = data;
   console.log(`MQTT: delete_result diterima — ID ${fingerprintId}, sukses: ${success}`);
+
+  // Hapus retained message di broker setelah ESP32 berhasil memproses delete.
+  // Ini mencegah perintah hapus dieksekusi ulang saat ESP32 restart berikutnya.
+  if (success && window.mqttClient?.connected) {
+    window.mqttClient.publish(TOPIC_DELETE_REQUEST, '', { retain: true, qos: 1 });
+    console.log('MQTT: retained delete_request dibersihkan dari broker');
+  }
+
   if (deleteResultCallback) {
     deleteResultCallback(data);
   }
@@ -154,8 +188,12 @@ export function publishDeleteRequest(fingerprintId) {
   }
 
   const payload = JSON.stringify({ fingerprintId });
-  window.mqttClient.publish(TOPIC_DELETE_REQUEST, payload);
-  console.log('MQTT: delete_request dikirim ->', payload);
+  // retain: true  → pesan disimpan di broker HiveMQ.
+  // Jika ESP32 sedang reboot saat perintah ini dikirim, pesan tetap tersimpan
+  // dan akan dikirim otomatis ke ESP32 begitu ia subscribe kembali saat boot.
+  // qos: 1 → pastikan pesan terkirim minimal 1 kali.
+  window.mqttClient.publish(TOPIC_DELETE_REQUEST, payload, { retain: true, qos: 1 });
+  console.log('MQTT: delete_request dikirim (retained) ->', payload);
   return true;
 }
 
@@ -165,9 +203,33 @@ export function publishClearAllRequest() {
     return false;
   }
 
-  // Mengirim perintah dengan ID "ALL" sebagai penanda reset total
-  const payload = JSON.stringify({ fingerprintId: "ALL" });
-  window.mqttClient.publish(TOPIC_DELETE_REQUEST, payload);
-  console.log('MQTT: clear_all request dikirim ->', payload);
+  // Mengirim perintah dengan ID "ALL" sebagai penanda reset total sensor.
+  // retain: true  → pesan disimpan di broker HiveMQ.
+  // Jika ESP32 sedang reboot saat perintah ini dikirim, pesan tetap tersimpan
+  // dan akan dikirim otomatis ke ESP32 begitu ia subscribe kembali saat boot.
+  // qos: 1 → pastikan pesan terkirim minimal 1 kali.
+  const payload = JSON.stringify({ fingerprintId: 'ALL' });
+  window.mqttClient.publish(TOPIC_DELETE_REQUEST, payload, { retain: true, qos: 1 });
+  console.log('MQTT: clear_all request dikirim (retained) ->', payload);
   return true;
 }
+
+/**
+ * Mengirim perintah reset (restart) ke ESP32 melalui MQTT.
+ * ESP32 akan memanggil ESP.restart() saat menerima pesan ini.
+ * retain: true → agar pesan tersimpan di broker jika ESP32 sedang offline.
+ * Setelah ESP32 restart dan subscribe ulang, ia akan menerima pesan ini,
+ * lalu membersihkan retained message agar tidak loop restart.
+ */
+export function publishResetRequest() {
+  if (!window.mqttClient || !window.mqttClient.connected) {
+    console.error('MQTT: client belum terhubung, tidak bisa kirim reset_request');
+    return false;
+  }
+
+  const payload = JSON.stringify({ action: 'restart', timestamp: Date.now() });
+  window.mqttClient.publish(TOPIC_RESET_REQUEST, payload, { retain: false, qos: 1 });
+  console.log('MQTT: reset_request dikirim ->', payload);
+  return true;
+}
+

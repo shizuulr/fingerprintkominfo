@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { LuPlus, LuPencil, LuTrash2, LuSearch, LuFingerprint, LuPrinter, LuSettings } from 'react-icons/lu';
-import { registerUserAndRequestEnroll, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor } from '../services/userService';
+import { LuPlus, LuPencil, LuTrash2, LuSearch, LuFingerprint, LuPrinter, LuSettings, LuCheck, LuRefreshCw } from 'react-icons/lu';
+import { registerUserAndRequestEnroll, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor, completeInternship } from '../services/userService';
 import { getAttendanceByFingerprintId } from '../services/attendanceService';
 import { getAllSidediLocations } from '../services/sidediService';
 import { publishEnrollRequest, publishDeleteRequest, publishClearAllRequest, registerDeleteResultCallback, unregisterDeleteResultCallback } from '../components/MqttListener';
@@ -8,12 +8,14 @@ import Modal from '../components/Modal';
 
 const initialFormData = {
   name: '',
+  nim_nisn: '',
   institution: '',
   division: 'TIK',
   major: '',
   phone: '',
   socialMedia: '',
   advisor: '',
+  no_hp_pembimbing: '',
   startDate: '',
   endDate: '',
 };
@@ -40,6 +42,10 @@ export default function UserManagement() {
   const [majors, setMajors] = useState([]);
   const [advisors, setAdvisors] = useState([]);
   const [sidediLocations, setSidediLocations] = useState([]);
+
+  // States for managing master data
+  const [isManageMajorsOpen, setIsManageMajorsOpen] = useState(false);
+  const [isManageAdvisorsOpen, setIsManageAdvisorsOpen] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -96,10 +102,28 @@ export default function UserManagement() {
     setError('');
     setInfoMsg('');
 
+    // Validasi nomor HP Indonesia untuk pembimbing
+    const phoneRegex = /^(?:\+62|62|0)8[1-9][0-9]{7,11}$/;
+    if (!formData.no_hp_pembimbing) {
+      setError('Nomor HP Pembimbing wajib diisi.');
+      setLoading(false);
+      return;
+    }
+    if (!phoneRegex.test(formData.no_hp_pembimbing.trim())) {
+      setError('Format Nomor HP Pembimbing tidak valid (gunakan format Indonesia seperti 08xxxxxxxxxx atau +628xxxxxxxxxx)');
+      setLoading(false);
+      return;
+    }
+
     try {
+      const formattedData = {
+        ...formData,
+        no_hp_pembimbing: formData.no_hp_pembimbing.trim()
+      };
+
       if (editingId) {
         // Edit data biasa - tidak menyentuh fingerprintId / proses enroll
-        await updateUser(editingId, formData);
+        await updateUser(editingId, formattedData);
         setSuccessMsg('Data peserta berhasil diperbarui!');
         setIsModalOpen(false);
         setFormData(initialFormData);
@@ -107,7 +131,7 @@ export default function UserManagement() {
         fetchUsers();
       } else {
         // Pendaftaran baru - simpan dulu, lalu minta ESP32 melakukan enroll
-        const user = await registerUserAndRequestEnroll(formData);
+        const user = await registerUserAndRequestEnroll(formattedData);
         const terkirim = publishEnrollRequest(user.id, formData.name);
 
         if (terkirim) {
@@ -141,8 +165,13 @@ export default function UserManagement() {
     }
   };
 
-  const handleDeleteMajor = async (id) => {
-    if (window.confirm('Hapus jurusan ini?')) {
+  const handleDeleteMajor = async (id, majorName) => {
+    const isUsed = users.some(u => u.major === majorName && u.isActive);
+    let confirmMsg = 'Hapus jurusan ini?';
+    if (isUsed) {
+      confirmMsg = `Peringatan: Jurusan "${majorName}" masih digunakan oleh peserta aktif. Tetap hapus?`;
+    }
+    if (window.confirm(confirmMsg)) {
       try {
         await deleteMajor(id);
         fetchDropdownData();
@@ -164,8 +193,13 @@ export default function UserManagement() {
     }
   };
 
-  const handleDeleteAdvisor = async (id) => {
-    if (window.confirm('Hapus pembimbing ini?')) {
+  const handleDeleteAdvisor = async (id, advisorName) => {
+    const isUsed = users.some(u => u.advisor === advisorName && u.isActive);
+    let confirmMsg = 'Hapus pembimbing ini?';
+    if (isUsed) {
+      confirmMsg = `Peringatan: Pembimbing "${advisorName}" masih digunakan oleh peserta aktif. Tetap hapus?`;
+    }
+    if (window.confirm(confirmMsg)) {
       try {
         await deleteAdvisor(id);
         fetchDropdownData();
@@ -175,15 +209,66 @@ export default function UserManagement() {
     }
   };
 
+  const canConfirmCompletion = (endDateStr) => {
+    if (!endDateStr) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(endDateStr + 'T00:00:00');
+    endDate.setHours(0, 0, 0, 0);
+    const diffTime = endDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= -7 && diffDays <= 7;
+  };
+
+  const handleCompleteInternship = async (user) => {
+    if (window.confirm(`Apakah Anda yakin ingin mengonfirmasi selesai magang untuk "${user.name}"? Data peserta akan diarsip dan sidik jari akan dihapus dari sensor.`)) {
+      try {
+        const result = await completeInternship(user.id);
+        if (result.success) {
+          if (result.fingerprintId) {
+            publishDeleteRequest(result.fingerprintId);
+          }
+          alert(`Kehadiran magang selesai untuk "${result.name}" berhasil dikonfirmasi. Sidik jari telah dihapus.`);
+          fetchUsers();
+        }
+      } catch (err) {
+        alert('Gagal mengonfirmasi selesai magang: ' + err.message);
+      }
+    }
+  };
+
+  // Kirim ulang permintaan enroll untuk peserta yang gagal enroll sebelumnya.
+  // Status direset ke 'menunggu_enroll' dan fingerprintId dikosongkan,
+  // lalu MQTT enroll_request dikirim ulang ke ESP32.
+  const handleRetryEnroll = async (user) => {
+    if (!window.confirm(`Kirim ulang permintaan enroll untuk "${user.name}"?\n\nPastikan peserta siap menempelkan jari di alat fingerprint.`)) return;
+    try {
+      await updateUser(user.id, { status: 'menunggu_enroll', fingerprintId: null });
+      const terkirim = publishEnrollRequest(user.id, user.name);
+      if (terkirim) {
+        setSuccessMsg(`Permintaan enroll ulang untuk ${user.name} berhasil dikirim!`);
+        setInfoMsg(`Silakan tempelkan jari ${user.name} di alat fingerprint sekarang untuk menyelesaikan pendaftaran.`);
+      } else {
+        setSuccessMsg(`Status ${user.name} direset ke "Menunggu Enroll".`);
+        setInfoMsg('Alat fingerprint belum terhubung. Pastikan alat menyala dan terhubung internet, lalu coba lagi.');
+      }
+      fetchUsers();
+    } catch (err) {
+      setError('Gagal mengirim enroll ulang: ' + err.message);
+    }
+  };
+
   const handleEdit = (user) => {
     setFormData({
       name: user.name || '',
+      nim_nisn: user.nim_nisn || '',
       institution: user.institution || '',
       division: user.division || 'TIK',
       major: user.major || '',
       phone: user.phone || '',
       socialMedia: user.socialMedia || '',
       advisor: user.advisor || '',
+      no_hp_pembimbing: user.no_hp_pembimbing || '',
       startDate: user.startDate || '',
       endDate: user.endDate || '',
     });
@@ -691,7 +776,17 @@ export default function UserManagement() {
       );
     }
     if (user.status === 'gagal_enroll') {
-      return <span className="badge badge--danger">Gagal Enroll</span>;
+      return (
+        <span
+          className="badge badge--danger"
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => handleRetryEnroll(user)}
+          title="Klik untuk kirim ulang permintaan enroll"
+        >
+          <LuRefreshCw style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+          Gagal Enroll — Klik Ulang
+        </span>
+      );
     }
     // default: menunggu_enroll
     return <span className="badge badge--warning">Menunggu Tempel Jari</span>;
@@ -753,8 +848,8 @@ export default function UserManagement() {
           <h2>Daftar Peserta Terdaftar</h2>
           <span className="badge badge--info">{filteredUsers.length} peserta</span>
         </div>
-        <div className="table-container">
-          <table className="table">
+        <div className="table-container" style={{ overflowX: 'auto' }}>
+          <table className="table" style={{ minWidth: '1500px' }}>
             <thead>
               <tr>
                 <th style={{ width: '40px', textAlign: 'center' }}>
@@ -766,17 +861,23 @@ export default function UserManagement() {
                 </th>
                 <th>No</th>
                 <th>Nama Peserta</th>
-                <th>Status Fingerprint</th>
+                <th>NIM/NISN</th>
                 <th>Instansi Asal</th>
+                <th>Jurusan</th>
+                <th>Pembimbing</th>
+                <th>No. HP Pembimbing</th>
+                <th>No. HP Peserta</th>
                 <th>Divisi/Bagian</th>
                 <th>Periode PKL</th>
+                <th>Media Sosial</th>
+                <th>Status Fingerprint</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="table-empty">
+                  <td colSpan="14" className="table-empty">
                     {searchTerm ? 'Tidak ada peserta yang sesuai pencarian' : 'Belum ada peserta terdaftar'}
                   </td>
                 </tr>
@@ -792,16 +893,42 @@ export default function UserManagement() {
                     </td>
                     <td>{index + 1}</td>
                     <td className="td-name">{user.name}</td>
-                    <td>{renderStatusEnroll(user)}</td>
-                    <td>{user.institution || '-'}</td>
-                    <td>{user.division || '-'}</td>
+                    <td>{user.nim_nisn ? user.nim_nisn : <span className="badge badge--danger">Belum Diisi</span>}</td>
+                    <td>{user.institution ? user.institution : <span className="badge badge--danger">-</span>}</td>
+                    <td>{user.major ? user.major : <span className="badge badge--danger">-</span>}</td>
+                    <td>{user.advisor ? user.advisor : <span className="badge badge--danger">Belum Diisi</span>}</td>
+                    <td>{user.no_hp_pembimbing ? user.no_hp_pembimbing : <span className="badge badge--danger">Belum Diisi</span>}</td>
+                    <td>{user.phone ? user.phone : <span className="badge badge--danger">-</span>}</td>
+                    <td>{user.division ? user.division : <span className="badge badge--danger">-</span>}</td>
                     <td>
                       {user.startDate && user.endDate
                         ? `${user.startDate} s/d ${user.endDate}`
-                        : '-'}
+                        : <span className="badge badge--danger">-</span>}
                     </td>
+                    <td>{user.socialMedia ? user.socialMedia : <span className="badge badge--danger">-</span>}</td>
+                    <td>{renderStatusEnroll(user)}</td>
                     <td>
                       <div className="action-buttons">
+                        {user.status === 'gagal_enroll' && (
+                          <button
+                            className="btn btn--icon"
+                            onClick={() => handleRetryEnroll(user)}
+                            title="Enroll Ulang"
+                            style={{ backgroundColor: '#f59e0b', color: 'white' }}
+                          >
+                            <LuRefreshCw />
+                          </button>
+                        )}
+                        {canConfirmCompletion(user.endDate) && (
+                          <button
+                            className="btn btn--icon"
+                            onClick={() => handleCompleteInternship(user)}
+                            title="Konfirmasi Selesai Magang"
+                            style={{ backgroundColor: '#3b82f6', color: 'white' }}
+                          >
+                            <LuCheck />
+                          </button>
+                        )}
                         {user.fingerprintId && (
                           <button
                             className="btn btn--icon"
@@ -864,16 +991,30 @@ export default function UserManagement() {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="institution">Instansi Asal</label>
-            <input
-              type="text"
-              id="institution"
-              name="institution"
-              value={formData.institution}
-              onChange={handleInputChange}
-              placeholder="Nama kampus/sekolah"
-            />
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="nim_nisn">NIM/NISN *</label>
+              <input
+                type="text"
+                id="nim_nisn"
+                name="nim_nisn"
+                value={formData.nim_nisn}
+                onChange={handleInputChange}
+                placeholder="Masukkan NIM atau NISN"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="institution">Instansi Asal</label>
+              <input
+                type="text"
+                id="institution"
+                name="institution"
+                value={formData.institution}
+                onChange={handleInputChange}
+                placeholder="Nama kampus/sekolah"
+              />
+            </div>
           </div>
 
           <div className="form-group">
@@ -908,6 +1049,7 @@ export default function UserManagement() {
                 ))}
               </select>
               <button type="button" className="btn btn--icon" onClick={handleAddMajor} title="Tambah Jurusan" style={{ backgroundColor: '#10b981', color: 'white' }}><LuPlus /></button>
+              <button type="button" className="btn btn--icon" onClick={() => setIsManageMajorsOpen(true)} title="Kelola Jurusan" style={{ backgroundColor: '#6366f1', color: 'white' }}><LuSettings /></button>
             </div>
           </div>
 
@@ -938,7 +1080,21 @@ export default function UserManagement() {
                 ))}
               </select>
               <button type="button" className="btn btn--icon" onClick={handleAddAdvisor} title="Tambah Pembimbing" style={{ backgroundColor: '#10b981', color: 'white' }}><LuPlus /></button>
+              <button type="button" className="btn btn--icon" onClick={() => setIsManageAdvisorsOpen(true)} title="Kelola Pembimbing" style={{ backgroundColor: '#6366f1', color: 'white' }}><LuSettings /></button>
             </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="no_hp_pembimbing">No HP Pembimbing *</label>
+            <input
+              type="text"
+              id="no_hp_pembimbing"
+              name="no_hp_pembimbing"
+              value={formData.no_hp_pembimbing}
+              onChange={handleInputChange}
+              placeholder="Masukkan No HP Pembimbing (mis. 08123456789)"
+              required
+            />
           </div>
 
           <div className="form-row">
@@ -987,7 +1143,7 @@ export default function UserManagement() {
             {deletingUser?.fingerprintId ? ` (Fingerprint #${deletingUser.fingerprintId})` : ''}?
           </p>
           <p className="text-muted">
-            Tindakan ini tidak dapat dibatalkan. Sistem akan otomatis mengirim perintah ke sensor untuk menghapus data sidik jari. Jika sensor tidak merespons dalam 10 detik, data di sistem tetap dihapus dan Anda perlu menghapus sidik jari di sensor secara manual.
+            Tindakan ini tidak dapat dibatalkan. Data peserta akan dihapus dari Firebase dan sidik jarinya akan dihapus dari sensor AS608. Jika ESP32 sedang reboot, perintah hapus tetap tersimpan dan akan diproses otomatis saat alat menyala kembali.
           </p>
           <div className="form-actions">
             <button
@@ -1018,7 +1174,7 @@ export default function UserManagement() {
             Apakah Anda yakin ingin menghapus <strong>{selectedUserIds.length} peserta</strong> yang Anda pilih?
           </p>
           <p className="text-muted">
-            Tindakan ini akan menghapus peserta terpilih dari database dan mengirim sinyal ke sensor sidik jari untuk mengosongkan slot id sidik jari mereka secara fisik. Peserta yang dihapus akan membebaskan slot id-nya agar dapat digunakan kembali oleh pendaftar baru.
+            Data peserta terpilih akan dihapus dari Firebase dan sidik jari mereka akan dihapus dari sensor AS608. Slot ID yang dikosongkan dapat langsung dipakai oleh pendaftar baru.
           </p>
           <div className="form-actions">
             <button
@@ -1059,7 +1215,7 @@ export default function UserManagement() {
             <li>Mereset ID fingerprint sehingga pendaftaran baru dimulai dari ID 1</li>
           </ul>
           <p className="text-muted">
-            Pastikan alat ESP32 dalam keadaan menyala dan terhubung internet agar data sensor ikut terhapus.
+            Perintah hapus sensor dikirim dengan sistem <em>retained MQTT</em> — jika ESP32 sedang reboot, perintah tetap tersimpan dan sensor akan ikut terhapus otomatis saat alat menyala kembali.
           </p>
           <div className="form-actions">
             <button
@@ -1074,9 +1230,83 @@ export default function UserManagement() {
               onClick={confirmResetAll}
               disabled={resetAllLoading}
             >
-              {resetAllLoading ? 'Menghapus Semua...' : 'Ya, Hapus Semua'}
+              {resetAllLoading ? 'Mereset...' : 'Ya, Hapus Semua'}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Manage Majors Modal */}
+      <Modal
+        isOpen={isManageMajorsOpen}
+        onClose={() => setIsManageMajorsOpen(false)}
+        title="Kelola Jurusan"
+      >
+        <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
+          {majors.length === 0 ? (
+            <p className="text-muted" style={{ textAlign: 'center', padding: '20px' }}>Belum ada data jurusan.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {majors.map((m) => (
+                <li key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border-color, #eee)' }}>
+                  <span>{m.name}</span>
+                  <button
+                    className="btn btn--icon btn--delete"
+                    onClick={() => handleDeleteMajor(m.id, m.name)}
+                    title="Hapus Jurusan"
+                    style={{ padding: '4px', height: 'auto', minWidth: 'auto' }}
+                  >
+                    <LuTrash2 size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="form-actions">
+          <button className="btn btn--secondary" onClick={() => setIsManageMajorsOpen(false)}>
+            Tutup
+          </button>
+          <button className="btn btn--primary" onClick={handleAddMajor}>
+            <LuPlus style={{ marginRight: '5px' }} /> Tambah Jurusan Baru
+          </button>
+        </div>
+      </Modal>
+
+      {/* Manage Advisors Modal */}
+      <Modal
+        isOpen={isManageAdvisorsOpen}
+        onClose={() => setIsManageAdvisorsOpen(false)}
+        title="Kelola Pembimbing"
+      >
+        <div style={{ maxHeight: '400px', overflowY: 'auto', marginBottom: '20px' }}>
+          {advisors.length === 0 ? (
+            <p className="text-muted" style={{ textAlign: 'center', padding: '20px' }}>Belum ada data pembimbing.</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {advisors.map((a) => (
+                <li key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border-color, #eee)' }}>
+                  <span>{a.name}</span>
+                  <button
+                    className="btn btn--icon btn--delete"
+                    onClick={() => handleDeleteAdvisor(a.id, a.name)}
+                    title="Hapus Pembimbing"
+                    style={{ padding: '4px', height: 'auto', minWidth: 'auto' }}
+                  >
+                    <LuTrash2 size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="form-actions">
+          <button className="btn btn--secondary" onClick={() => setIsManageAdvisorsOpen(false)}>
+            Tutup
+          </button>
+          <button className="btn btn--primary" onClick={handleAddAdvisor}>
+            <LuPlus style={{ marginRight: '5px' }} /> Tambah Pembimbing Baru
+          </button>
         </div>
       </Modal>
     </div>

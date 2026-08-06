@@ -6,14 +6,28 @@ export function useTheme() {
     return saved || 'dark'; // default gelap
   });
 
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('fontSize');
+    return saved || 'sedang'; // default sedang
+  });
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-fontsize', fontSize);
+    localStorage.setItem('fontSize', fontSize);
+  }, [fontSize]);
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  return { theme, toggleTheme };
+  const setThemeMode = (mode) => {
+    setTheme(mode);
+  };
+
+  return { theme, toggleTheme, setThemeMode, fontSize, setFontSize };
 }

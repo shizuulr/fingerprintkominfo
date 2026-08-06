@@ -2,7 +2,6 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -12,89 +11,68 @@ import {
   Timestamp,
   arrayUnion,
   arrayRemove,
+  writeBatch,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
-const DISTRICTS_COLLECTION = 'districts';
 const SIDEDI_COLLECTION = 'sidedi_locations';
 const SCHEDULES_COLLECTION = 'schedules';
 const ATTENDANCE_COLLECTION = 'attendance_logs';
 
-// --- CRUD KECAMATAN (DISTRICTS) ---
-export const addDistrict = async (name) => {
-  const docRef = await addDoc(collection(db, DISTRICTS_COLLECTION), {
-    name,
-    createdAt: Timestamp.fromDate(new Date()),
-  });
-  return { id: docRef.id, name };
-};
-
-export const getAllDistricts = async () => {
-  const q = query(collection(db, DISTRICTS_COLLECTION), orderBy('name', 'asc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
-};
-
-export const deleteDistrict = async (districtId) => {
-  // Sebelum menghapus kecamatan, pastikan tidak ada desa di bawahnya yang masih bergantung
-  const q = query(collection(db, SIDEDI_COLLECTION), where('districtId', '==', districtId));
-  const snapshot = await getDocs(q);
-  if (!snapshot.empty) {
-    throw new Error('Tidak dapat menghapus kecamatan karena masih memiliki desa di dalamnya.');
-  }
-  await deleteDoc(doc(db, DISTRICTS_COLLECTION, districtId));
-  return { id: districtId };
-};
-
-// --- CRUD DESA (SIDEDI_LOCATIONS) ---
-export const addSidediLocation = async (name, districtId) => {
-  const docRef = await addDoc(collection(db, SIDEDI_COLLECTION), {
-    name,
-    districtId,
-    createdAt: Timestamp.fromDate(new Date()),
-    participantIds: [],
-  });
-  return { id: docRef.id, name, districtId, participantIds: [] };
-};
-
+// --- MANAJEMEN ANGGOTA DESA ---
+// Ambil semua data lokasi sidedi dari Firestore (hanya participantIds)
 export const getAllSidediLocations = async () => {
   const snapshot = await getDocs(collection(db, SIDEDI_COLLECTION));
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
   }));
 };
 
-export const deleteSidediLocation = async (locationId) => {
-  await deleteDoc(doc(db, SIDEDI_COLLECTION, locationId));
-  return { id: locationId };
+// Pastikan dokumen desa ada di Firestore (berdasarkan ID hardcoded)
+// Jika belum ada, buat dengan participantIds kosong
+export const ensureDesaExists = async (desaId, desaName, kecamatanId, kecamatanName) => {
+  const docRef = doc(db, SIDEDI_COLLECTION, desaId);
+  const docSnap = await getDoc(docRef);
+  if (!docSnap.exists()) {
+    await writeBatch(db)
+      .set(docRef, {
+        name: desaName,
+        kecamatanId,
+        kecamatanName,
+        participantIds: [],
+        createdAt: Timestamp.fromDate(new Date()),
+      })
+      .commit();
+  }
+  return { id: desaId, name: desaName, kecamatanId, kecamatanName };
 };
 
-// --- MANAJEMEN ANGGOTA DESA ---
-export const addParticipantToSidedi = async (locationId, userId) => {
-  // Hapus peserta dari desa lain terlebih dahulu jika terdaftar
+// Tambahkan peserta ke desa (hapus dari desa lain terlebih dahulu)
+export const addParticipantToSidedi = async (desaId, userId) => {
+  // Hapus peserta dari desa lain jika sudah terdaftar
   const allLocations = await getAllSidediLocations();
-  for (const locItem of allLocations) {
-    if (locItem.participantIds && locItem.participantIds.includes(userId)) {
-      await updateDoc(doc(db, SIDEDI_COLLECTION, locItem.id), {
-        participantIds: arrayRemove(userId)
+  const batch = writeBatch(db);
+  for (const loc of allLocations) {
+    if (loc.participantIds && loc.participantIds.includes(userId)) {
+      batch.update(doc(db, SIDEDI_COLLECTION, loc.id), {
+        participantIds: arrayRemove(userId),
       });
     }
   }
+  await batch.commit();
 
-  // Tambahkan peserta ke desa baru
-  await updateDoc(doc(db, SIDEDI_COLLECTION, locationId), {
-    participantIds: arrayUnion(userId)
+  // Tambahkan ke desa baru
+  await updateDoc(doc(db, SIDEDI_COLLECTION, desaId), {
+    participantIds: arrayUnion(userId),
   });
   return { success: true };
 };
 
-export const removeParticipantFromSidedi = async (locationId, userId) => {
-  await updateDoc(doc(db, SIDEDI_COLLECTION, locationId), {
-    participantIds: arrayRemove(userId)
+export const removeParticipantFromSidedi = async (desaId, userId) => {
+  await updateDoc(doc(db, SIDEDI_COLLECTION, desaId), {
+    participantIds: arrayRemove(userId),
   });
   return { success: true };
 };
@@ -109,7 +87,6 @@ export const saveSchedule = async (userId, userName, date, location) => {
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) {
-    // Tambah baru
     const docRef = await addDoc(collection(db, SCHEDULES_COLLECTION), {
       userId,
       userName,
@@ -119,7 +96,6 @@ export const saveSchedule = async (userId, userName, date, location) => {
     });
     return { id: docRef.id, userId, userName, date, location };
   } else {
-    // Update lokasi
     const scheduleId = snapshot.docs[0].id;
     await updateDoc(doc(db, SCHEDULES_COLLECTION, scheduleId), {
       location,
@@ -136,9 +112,9 @@ export const getSchedulesByDateRange = async (startDate, endDate) => {
     where('date', '<=', endDate)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
   }));
 };
 
@@ -148,15 +124,14 @@ export const getTodaySchedules = async (date) => {
     where('date', '==', date)
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
+  return snapshot.docs.map((docSnap) => ({
+    id: docSnap.id,
+    ...docSnap.data(),
   }));
 };
 
-// --- KONFIRMASI KEHADIRAN (MANUAL UNTUK SIDEDI) ---
+// --- KONFIRMASI KEHADIRAN MANUAL SIDEDI ---
 export const confirmSidediAttendance = async (userId, userName, date, fingerprintId = 0) => {
-  // Cek apakah hari ini sudah ada log absen
   const q = query(
     collection(db, ATTENDANCE_COLLECTION),
     where('fingerprintId', '==', Number(fingerprintId || 0)),

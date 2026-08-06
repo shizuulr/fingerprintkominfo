@@ -117,6 +117,34 @@
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Font Size Overrides ── */
+[data-fontsize="kecil"] {
+  --font-size-xs: 0.625rem;
+  --font-size-sm: 0.6875rem;
+  --font-size-base: 0.8125rem;
+  --font-size-lg: 0.9375rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.625rem;
+}
+
+[data-fontsize="sedang"] {
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+}
+
+[data-fontsize="besar"] {
+  --font-size-xs: 0.875rem;
+  --font-size-sm: 0.9375rem;
+  --font-size-base: 1.0625rem;
+  --font-size-lg: 1.3125rem;
+  --font-size-xl: 1.75rem;
+  --font-size-2xl: 2.375rem;
+}
+
 /* ── Light Theme Override ── */
 [data-theme="light"] {
   /* Clean White base */
@@ -1394,6 +1422,410 @@ body::before {
   background: rgba(239, 68, 68, 0.15);
   color: var(--color-danger-light);
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ══════════════════════════════════════════
+   Settings Page — Premium Design
+   ══════════════════════════════════════════ */
+
+.settings-page {
+  max-width: 800px;
+}
+
+.settings-card {
+  overflow: hidden;
+}
+
+.settings-card__body {
+  padding-top: var(--space-sm);
+}
+
+.settings-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+
+/* ── Theme Selector ── */
+.theme-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border-color);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  font-family: var(--font-family);
+  text-align: left;
+}
+
+.theme-option:hover {
+  border-color: var(--border-color-hover);
+  background: var(--bg-input-focus);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.theme-option.active {
+  border-color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.08);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.theme-option__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.theme-option__icon--light {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.theme-option__icon--dark {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.theme-option__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.theme-option__label {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.theme-option__desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.theme-option__check {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  animation: scaleIn 0.3s ease;
+}
+
+/* ── Font Size Selector ── */
+.fontsize-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.fontsize-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border-color);
+  background: var(--bg-input);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  font-family: var(--font-family);
+  text-align: center;
+}
+
+.fontsize-option:hover {
+  border-color: var(--border-color-hover);
+  background: var(--bg-input-focus);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.fontsize-option.active {
+  border-color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.08);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.fontsize-option__preview {
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  transition: font-size var(--transition-base);
+}
+
+.fontsize-option__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fontsize-option__label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fontsize-option__desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.fontsize-option__check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  animation: scaleIn 0.3s ease;
+}
+
+.fontsize-preview {
+  margin-top: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-input);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+}
+
+.fontsize-preview__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  display: block;
+}
+
+.fontsize-preview__text {
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+/* ── WiFi Settings Section ── */
+.wifi-settings-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.wifi-usb-section {
+  display: flex;
+  align-items: center;
+  padding-bottom: var(--space-md);
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.btn--usb-connect {
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wifi-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* ── ESP32 Reset Section ── */
+.settings-card--danger {
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.esp-reset-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.esp-reset__info h3 {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.esp-reset__info p {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.esp-reset__warning {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-light);
+  font-weight: 500;
+}
+
+.btn--reset-esp {
+  align-self: flex-start;
+  padding: 12px 24px;
+  font-size: var(--font-size-base);
+}
+
+.esp-reset__confirm {
+  animation: fadeIn 0.3s ease;
+}
+
+.esp-reset__confirm-box {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  text-align: center;
+}
+
+.esp-reset__confirm-icon {
+  font-size: 2.5rem;
+  color: var(--color-warning);
+  margin-bottom: var(--space-md);
+}
+
+.esp-reset__confirm-box > p {
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+/* Spin animation for loading icon */
+.spin {
+  animation: spinRotate 1s linear infinite;
+}
+
+@keyframes spinRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+/* ── Light Mode — Settings Page ── */
+[data-theme="light"] .theme-option {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+[data-theme="light"] .theme-option:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+[data-theme="light"] .theme-option.active {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+[data-theme="light"] .fontsize-option {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+[data-theme="light"] .fontsize-option:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+[data-theme="light"] .fontsize-option.active {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+[data-theme="light"] .fontsize-preview {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+[data-theme="light"] .esp-reset__warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+[data-theme="light"] .wifi-usb-section {
+  border-bottom-color: #e5e7eb;
+}
+
+[data-theme="light"] .esp-reset__confirm-box {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+[data-theme="light"] .settings-card--danger {
+  border-color: #fecaca;
+}
+
+/* ── Responsive — Settings Page ── */
+@media (max-width: 640px) {
+  .theme-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .fontsize-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-option {
+    padding: var(--space-md);
+  }
+
+  .fontsize-option {
+    flex-direction: row;
+    text-align: left;
+    padding: var(--space-md);
+  }
+
+  .fontsize-option__check {
+    position: static;
+  }
+
+  .fontsize-option__info {
+    flex: 1;
+  }
 }
 
 /* ── Animations ── */

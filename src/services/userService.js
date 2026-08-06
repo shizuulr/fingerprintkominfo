@@ -2,6 +2,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -172,4 +173,80 @@ export const getAllAdvisors = async () => {
 export const deleteAdvisor = async (advisorId) => {
   await deleteDoc(doc(db, 'advisors', advisorId));
   return { id: advisorId };
+};
+
+export const completeInternship = async (userId) => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    throw new Error('Peserta tidak ditemukan.');
+  }
+  const userData = userSnap.data();
+
+  // 1. Fetch attendance logs for this participant
+  let logsList = [];
+  let countHadir = 0;
+  let countAlpa = 0;
+  let countIzin = 0;
+
+  if (userData.fingerprintId) {
+    const q = query(
+      collection(db, 'attendance_logs'),
+      where('fingerprintId', '==', Number(userData.fingerprintId))
+    );
+    const logsSnap = await getDocs(q);
+    logsSnap.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      logsList.push({
+        id: docSnap.id,
+        ...data,
+        checkIn: data.checkIn?.toDate?.() ? data.checkIn.toDate().toISOString() : null,
+        checkOut: data.checkOut?.toDate?.() ? data.checkOut.toDate().toISOString() : null
+      });
+
+      if (data.location === 'izin') {
+        countIzin++;
+      } else if (data.status && (data.status.includes('Hadir') || data.status.includes('Terlambat') || data.status.includes('SIDEDI'))) {
+        countHadir++;
+      } else if (data.status && data.status.includes('Alfa')) {
+        countAlpa++;
+      }
+    });
+  }
+
+  // Sort logs by date desc
+  logsList.sort((a, b) => b.date.localeCompare(a.date));
+
+  // 2. Add to riwayat_peserta_magang
+  await addDoc(collection(db, 'riwayat_peserta_magang'), {
+    name: userData.name,
+    institution: userData.institution || '',
+    major: userData.major || '',
+    startDate: userData.startDate || '',
+    endDate: userData.endDate || '',
+    division: userData.division || '',
+    nim_nisn: userData.nim_nisn || '',
+    advisor: userData.advisor || '',
+    no_hp_pembimbing: userData.no_hp_pembimbing || '',
+    status: 'selesai',
+    totalHadir: countHadir,
+    totalAlpa: countAlpa,
+    totalIzin: countIzin,
+    rekap_harian: logsList,
+    completedAt: Timestamp.fromDate(new Date())
+  });
+
+  // 3. Delete from users (active)
+  await deleteDoc(userRef);
+
+  return { success: true, fingerprintId: userData.fingerprintId, name: userData.name };
+};
+
+export const getCompletedInterns = async () => {
+  const snapshot = await getDocs(collection(db, 'riwayat_peserta_magang'));
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    completedAt: doc.data().completedAt?.toDate?.() || null
+  })).sort((a, b) => b.name.localeCompare(a.name));
 };

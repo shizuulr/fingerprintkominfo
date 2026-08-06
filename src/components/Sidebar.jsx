@@ -1,5 +1,6 @@
+import { useRef, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuFingerprint, LuMapPin, LuSun, LuMoon } from 'react-icons/lu';
+import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSun, LuMoon, LuSettings } from 'react-icons/lu';
 import { useTheme } from '../hooks/useTheme';
 
 const menuItems = [
@@ -7,16 +8,39 @@ const menuItems = [
   { path: '/peserta', icon: <LuUsers />, label: 'Peserta' },
   { path: '/riwayat', icon: <LuCalendarDays />, label: 'Riwayat' },
   { path: '/magang-sidedi', icon: <LuMapPin />, label: 'SIDEDI' },
+  { path: '/pengaturan', icon: <LuSettings />, label: 'Pengaturan' },
 ];
 
 export default function Sidebar() {
   const { theme, toggleTheme } = useTheme();
 
+  // ── Tap 5x pada judul untuk mengaktifkan debug mode ──
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef(null);
+
+  const handleTitleTap = useCallback(() => {
+    tapCountRef.current += 1;
+
+    // Reset counter setelah 2 detik tanpa tap
+    clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 2000);
+
+    // Jika sudah 5 kali tap dalam 2 detik, aktifkan debug mode
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      clearTimeout(tapTimerRef.current);
+      // Dispatch custom event yang didengarkan oleh DebugButton
+      window.dispatchEvent(new CustomEvent('debug-mode-activated'));
+    }
+  }, []);
+
   return (
     <>
       {/* Desktop / Tablet sidebar */}
       <aside className="sidebar">
-        <div className="sidebar-brand">
+        <div className="sidebar-brand" onClick={handleTitleTap} style={{ cursor: 'pointer', userSelect: 'none' }}>
           <div className="sidebar-logo">
             <img src="/logo-temanggung.png" alt="Logo Temanggung" className="sidebar-logo-img" />
           </div>
@@ -66,15 +90,7 @@ export default function Sidebar() {
             <span className="bottom-nav-label">{item.label}</span>
           </NavLink>
         ))}
-        <button
-          className="bottom-nav-link"
-          onClick={toggleTheme}
-        >
-          <span className="bottom-nav-icon">{theme === 'dark' ? <LuSun /> : <LuMoon />}</span>
-          <span className="bottom-nav-label">Tema</span>
-        </button>
       </nav>
     </>
   );
 }
-
