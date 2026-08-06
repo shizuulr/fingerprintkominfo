@@ -358,7 +358,7 @@ Menyimpan snapshot log dari perangkat saat admin/pengembang mendeteksi masalah a
 
 ### 9.1. Dashboard (`/`)
 - **Real-Time Clock & Status Indicator**: Menampilkan jam digital serta indikator status hari kerja (Hari Kerja biasa, Hari Jumat dengan jam pulang 14:30, atau Hari Libur).
-- **Statistik Kehadiran**: Kartu statistik *Hadir*, *Terlambat*, *Belum Masuk*, *Sudah Keluar*, dan *Izin*.
+- **Statistik Kehadiran Terpisah**: Kartu statistik kini dipisah secara akurat berdasarkan lokasi penempatan: Kantor (KOMINFO) memuat *Hadir Tepat Waktu*, *Terlambat*, *Belum Masuk*, dan *Sudah Keluar*. Sedangkan Magang Desa (SIDEDI) memuat *Hadir di Desa* dan *Belum Dikonfirmasi*. Data *Izin* digabungkan secara universal.
 - **Pemberian Izin Peserta**: Fitur bagi admin untuk memberikan status izin bagi peserta yang belum absen. Dilengkapi pop-up modal untuk memilih tipe izin (Sakit, Sekolah/Kampus, Lainnya) dan input keterangan/catatan spesifik.
 - **Tabel Absensi Real-Time**: Daftar absensi hari ini yang diperbarui secara langsung saat scan terjadi, termasuk indikator izin (Sakit/Kampus/Lainnya) dan keterangan (jika ada).
 - **Konfirmasi Absensi SIDEDI Direct**: Fitur bagi admin untuk mengonfirmasi kehadiran peserta magang SIDEDI beserta indikator progres harian (rating/persentase).
@@ -651,4 +651,13 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
 
 ### 20.3. Pembersihan Antarmuka (Clean UI)
 - **Pembersihan Emotikon**: Mengeliminasi penggunaan simbol emoji berlebih (seperti 🐛 pada tombol debug dan 🤒/🏫/📋 pada badge status izin `StatusBadge.jsx`) agar tampilan antarmuka terkesan lebih bersih, resmi, dan profesional.
+
+### 20.4. Restrukturisasi Statistik Dashboard
+- **Latar Belakang**: Terdapat anomali perhitungan pada statistik "Belum Masuk" yang sebelumnya hanya mengandalkan selisih jumlah total tanpa membedakan status jadwal khusus.
+- **Implementasi Utama**: 
+  - Memisahkan blok tampilan menjadi **Kantor (KOMINFO)** dan **Magang Desa (SIDEDI)** pada `Dashboard.jsx`.
+  - Memperbaiki logika filter untuk menghitung nilai pasti:
+    - **Hadir / Terlambat**: Sekarang melacak teks awal `Hadir (KOMINFO)` vs `Hadir (SIDEDI)`.
+    - **Belum Dikonfirmasi (SIDEDI)**: Mengekstrak peserta yang hari ini punya jadwal SIDEDI namun belum ada rekaman absensi apa pun (Hadir/Izin).
+    - **Belum Masuk (KOMINFO)**: Mengekstrak peserta dari daftar aktif yang *tidak* memiliki jadwal SIDEDI hari ini dan belum absensi masuk.
 

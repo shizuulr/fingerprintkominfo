@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck, LuSettings, LuRefreshCw, LuCalendarDays } from 'react-icons/lu';
+import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck, LuSettings, LuRefreshCw, LuCalendarDays, LuMapPin, LuBuilding2 } from 'react-icons/lu';
 import { subscribeToTodayAttendance, getTodayDate, isFriday, isOffDay, deleteAttendanceLog, confirmSidediAttendance, getAttendanceByDateRange, submitLeavePermission, submitTemporaryExit, submitTemporaryReturn, getAttendanceStatus } from '../services/attendanceService';
 import { getActiveUsers } from '../services/userService';
 import { getTodaySchedules } from '../services/sidediService';
@@ -92,13 +92,52 @@ export default function Dashboard() {
     fetchDayStatus();
   }, [attendance]);
 
-  // Calculate statistics
+  // Calculate statistics — separated by KOMINFO and SIDEDI
   const izinCount = attendance.filter((a) => a.location === 'izin').length;
+
+  // KOMINFO stats (kantor)
+  const hadirKominfo = attendance.filter((a) => a.status && a.status.startsWith('Hadir (KOMINFO)')).length;
+  const terlambatKominfo = attendance.filter((a) => a.status && a.status.startsWith('Terlambat (KOMINFO)')).length;
+  const sudahKeluarKominfo = attendance.filter((a) => a.location === 'kominfo' && a.checkOut !== null).length;
+
+  // SIDEDI stats (desa)
+  const hadirSidedi = attendance.filter((a) => a.status && a.status.startsWith('Hadir (SIDEDI)')).length;
+
+  // Find users who are scheduled at sidedi but haven't confirmed attendance yet
+  const unconfirmedSidediUsers = sidediSchedules.map(schedule => {
+    return activeUsers.find(u => u.id === schedule.userId);
+  }).filter(user => {
+    if (!user) return false;
+    const hasAttended = attendance.some(a => 
+      (a.fingerprintId && a.fingerprintId === user.fingerprintId) || 
+      a.userName === user.name
+    );
+    return !hasAttended;
+  });
+
+  const belumMasukSidedi = unconfirmedSidediUsers.length;
+
+  // Find kominfo users who haven't attended yet
+  const belumMasukKominfo = activeUsers.filter(user => {
+    // Is user scheduled for SIDEDI today? If yes, they belong to Sidedi expected, not Kominfo
+    const isSidedi = sidediSchedules.some(s => s.userId === user.id);
+    if (isSidedi) return false;
+
+    // Has user attended or izin today?
+    const hasAttended = attendance.some(a => 
+      (a.fingerprintId && a.fingerprintId === user.fingerprintId) || 
+      a.userName === user.name
+    );
+    return !hasAttended;
+  }).length;
+
   const stats = {
-    hadir: attendance.filter((a) => a.status === 'Hadir').length,
-    terlambat: attendance.filter((a) => a.status === 'Terlambat').length,
-    belumMasuk: totalUsers - attendance.length,
-    sudahKeluar: attendance.filter((a) => a.checkOut !== null).length,
+    hadirKominfo,
+    terlambatKominfo,
+    sudahKeluarKominfo,
+    hadirSidedi,
+    belumMasukKominfo,
+    belumMasukSidedi,
     izin: izinCount,
   };
 
@@ -235,14 +274,7 @@ export default function Dashboard() {
     return !attendance.some(a => a.fingerprintId === user.fingerprintId);
   });
 
-  // Find users who are scheduled at sidedi but haven't confirmed attendance yet
-  const unconfirmedSidediUsers = sidediSchedules.map(schedule => {
-    return activeUsers.find(u => u.id === schedule.userId);
-  }).filter(user => {
-    if (!user) return false;
-    const hasAttended = attendance.some(a => a.fingerprintId === user.fingerprintId);
-    return !hasAttended;
-  });
+
 
   const handlePrintGlobal = async () => {
     if (!startDate || !endDate) {
@@ -398,40 +430,72 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          {/* Stats Cards (Hidden on weekend and national holidays) */}
+          {/* Stats Cards (Hidden on national holidays) */}
           {dayType !== 'libur_nasional' && (
-            <div className="stats-grid">
-              <StatsCard
-                icon={<LuUserCheck />}
-                label="Hadir Tepat Waktu"
-                value={stats.hadir}
-                color="success"
-              />
-              <StatsCard
-                icon={<LuClock />}
-                label="Terlambat"
-                value={stats.terlambat}
-                color="warning"
-              />
-              <StatsCard
-                icon={<LuUserX />}
-                label="Belum Masuk"
-                value={stats.belumMasuk < 0 ? 0 : stats.belumMasuk}
-                color="danger"
-              />
-              <StatsCard
-                icon={<LuLogOut />}
-                label="Sudah Keluar"
-                value={stats.sudahKeluar}
-                color="info"
-              />
-              <StatsCard
-                icon={<LuShieldCheck />}
-                label="Izin"
-                value={stats.izin}
-                color="primary"
-              />
-            </div>
+            <>
+              {/* KOMINFO Stats */}
+              <h3 style={{ margin: '0 0 12px 0', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <LuBuilding2 /> Kantor (KOMINFO)
+              </h3>
+              <div className="stats-grid">
+                <StatsCard
+                  icon={<LuUserCheck />}
+                  label="Hadir Tepat Waktu"
+                  value={stats.hadirKominfo}
+                  color="success"
+                />
+                <StatsCard
+                  icon={<LuClock />}
+                  label="Terlambat"
+                  value={stats.terlambatKominfo}
+                  color="warning"
+                />
+                <StatsCard
+                  icon={<LuUserX />}
+                  label="Belum Masuk"
+                  value={stats.belumMasukKominfo < 0 ? 0 : stats.belumMasukKominfo}
+                  color="danger"
+                />
+                <StatsCard
+                  icon={<LuLogOut />}
+                  label="Sudah Keluar"
+                  value={stats.sudahKeluarKominfo}
+                  color="info"
+                />
+              </div>
+
+              {/* SIDEDI Stats */}
+              <h3 style={{ margin: '20px 0 12px 0', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <LuMapPin /> Magang Desa (SIDEDI)
+              </h3>
+              <div className="stats-grid">
+                <StatsCard
+                  icon={<LuUserCheck />}
+                  label="Hadir di Desa"
+                  value={stats.hadirSidedi}
+                  color="success"
+                />
+                <StatsCard
+                  icon={<LuUserX />}
+                  label="Belum Dikonfirmasi"
+                  value={stats.belumMasukSidedi < 0 ? 0 : stats.belumMasukSidedi}
+                  color="danger"
+                />
+              </div>
+
+              {/* Izin (Combined) */}
+              <h3 style={{ margin: '20px 0 12px 0', color: 'var(--text-secondary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <LuShieldCheck /> Izin (Semua Lokasi)
+              </h3>
+              <div className="stats-grid">
+                <StatsCard
+                  icon={<LuShieldCheck />}
+                  label="Izin"
+                  value={stats.izin}
+                  color="primary"
+                />
+              </div>
+            </>
           )}
 
       {/* Konfirmasi Magang SIDEDI */}
