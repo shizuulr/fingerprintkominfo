@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSun, LuMoon, LuSettings } from 'react-icons/lu';
+import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSun, LuMoon, LuSettings, LuPanelLeftClose, LuPanelLeftOpen } from 'react-icons/lu';
 import { useTheme } from '../hooks/useTheme';
 
 const menuItems = [
@@ -11,7 +11,7 @@ const menuItems = [
   { path: '/pengaturan', icon: <LuSettings />, label: 'Pengaturan' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false, onToggle, zoomLevel }) {
   const { theme, toggleTheme } = useTheme();
 
   // ── Tap 5x pada judul untuk mengaktifkan debug mode ──
@@ -39,13 +39,26 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop / Tablet sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+        {/* Toggle Button */}
+        <button
+          className="sidebar-toggle"
+          onClick={onToggle}
+          title={collapsed ? 'Perluas Menu' : 'Kecilkan Menu'}
+        >
+          {collapsed ? <LuPanelLeftOpen /> : <LuPanelLeftClose />}
+        </button>
+
         <div className="sidebar-brand" onClick={handleTitleTap} style={{ cursor: 'pointer', userSelect: 'none' }}>
           <div className="sidebar-logo">
             <img src="/logo-temanggung.png" alt="Logo Temanggung" className="sidebar-logo-img" />
           </div>
-          <h1>SIAP</h1>
-          <p>Sistem Informasi Absensi PKL</p>
+          {!collapsed && (
+            <>
+              <h1>SIAP</h1>
+              <p>Sistem Informasi Absensi PKL</p>
+            </>
+          )}
         </div>
 
         <nav className="sidebar-nav">
@@ -56,14 +69,21 @@ export default function Sidebar() {
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? 'active' : ''}`
               }
+              title={collapsed ? item.label : undefined}
             >
               <span className="sidebar-icon">{item.icon}</span>
-              <span className="sidebar-label">{item.label}</span>
+              {!collapsed && <span className="sidebar-label">{item.label}</span>}
             </NavLink>
           ))}
         </nav>
 
         <div className="sidebar-footer">
+          {/* Zoom indicator */}
+          {zoomLevel !== undefined && zoomLevel !== 100 && !collapsed && (
+            <span className="zoom-indicator" title="Zoom Level">
+              {zoomLevel}%
+            </span>
+          )}
           <button
             className="theme-toggle"
             onClick={toggleTheme}
@@ -71,8 +91,12 @@ export default function Sidebar() {
           >
             {theme === 'dark' ? <LuSun /> : <LuMoon />}
           </button>
-          <p>© 2026 Sistem Absensi</p>
-          <p>Kerja Praktik</p>
+          {!collapsed && (
+            <>
+              <p>© 2026 Sistem Absensi</p>
+              <p>Kerja Praktik</p>
+            </>
+          )}
         </div>
       </aside>
 

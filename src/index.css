@@ -576,6 +576,7 @@ body::before {
   padding: var(--space-xl);
   min-height: 100vh;
   animation: fadeIn 0.5s ease;
+  transition: margin-left var(--transition-base);
 }
 
 /* ── Sidebar ── */
@@ -592,6 +593,7 @@ body::before {
   z-index: 100;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  transition: width var(--transition-base);
 }
 
 .sidebar-brand {
@@ -729,6 +731,70 @@ body::before {
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   line-height: 1.8;
+}
+
+/* ── Sidebar Toggle & Zoom ── */
+.sidebar-toggle {
+  position: absolute;
+  top: 24px;
+  right: -16px;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  z-index: 101;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-toggle:hover {
+  background: var(--color-primary-light);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.app-layout.sidebar-collapsed .sidebar {
+  width: 80px;
+}
+
+.app-layout.sidebar-collapsed .sidebar-brand {
+  padding: var(--space-lg) 0;
+}
+
+.app-layout.sidebar-collapsed .sidebar-logo {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 0;
+}
+
+.app-layout.sidebar-collapsed .sidebar-link {
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.app-layout.sidebar-collapsed .sidebar-icon {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.app-layout.sidebar-collapsed .main-content {
+  margin-left: 80px;
+}
+
+.zoom-indicator {
+  font-size: 0.75rem;
+  font-weight: bold;
+  background: var(--glass-bg);
+  padding: 4px 8px;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
 }
 
 /* ── Page Layout ── */
