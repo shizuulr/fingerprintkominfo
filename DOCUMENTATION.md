@@ -670,3 +670,10 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
     - **Belum Dikonfirmasi (SIDEDI)**: Mengekstrak peserta yang hari ini punya jadwal SIDEDI namun belum ada rekaman absensi apa pun (Hadir/Izin).
     - **Belum Masuk (KOMINFO)**: Mengekstrak peserta dari daftar aktif yang *tidak* memiliki jadwal SIDEDI hari ini dan belum absensi masuk.
 
+### 20.5. Navigasi Fleksibel (Collapsible Sidebar) & Custom Global Zoom
+- **Latar Belakang**: Meningkatkan kenyamanan antarmuka pengguna pada berbagai resolusi layar (desktop, laptop, tablet) saat mengawasi dashboard absensi real-time.
+- **Implementasi Utama**:
+  - **`src/components/Sidebar.jsx`**: Penambahan tombol toggle `sidebar-toggle` untuk meminimalkan sidebar menjadi mode ikon saja serta indikator persentase *zoom* saat aktif.
+  - **`src/App.jsx`**: Pengelolaan state `sidebarCollapsed` dan `zoomLevel` yang tersimpan permanen di `localStorage`. Menambahkan listener event `wheel` (dengan `e.ctrlKey` & `{ passive: false }`) dan pintasan keyboard (`Ctrl +`, `Ctrl -`, `Ctrl 0`).
+  - **`src/index.css`**: Penyesuaian responsif CSS untuk `.app-layout.sidebar-collapsed` dan animasi transisi lebar sidebar serta penyesuaian margin area konten utama (`.main-content`).
+
