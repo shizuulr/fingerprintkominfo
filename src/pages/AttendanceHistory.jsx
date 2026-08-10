@@ -293,7 +293,6 @@ export default function AttendanceHistory() {
                 <tr>
                   <th>No</th>
                   <th>Nama Peserta</th>
-                  <th>NIM/NISN</th>
                   <th>Instansi/Sekolah</th>
                   <th>Jurusan</th>
                   <th>Periode Magang</th>
@@ -313,7 +312,6 @@ export default function AttendanceHistory() {
                     <tr key={intern.id} className="table-row-animate">
                       <td>{index + 1}</td>
                       <td className="td-name">{intern.name}</td>
-                      <td>{intern.nim_nisn || '-'}</td>
                       <td>{intern.institution || '-'}</td>
                       <td>{intern.major || '-'}</td>
                       <td>{intern.startDate && intern.endDate ? `${intern.startDate} s/d ${intern.endDate}` : '-'}</td>
@@ -354,7 +352,6 @@ export default function AttendanceHistory() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px', padding: '15px', backgroundColor: 'var(--bg-card)', borderRadius: '6px', border: '1px solid var(--border-color)', fontSize: '13px' }}>
                 <div>
                   <p style={{ margin: '4px 0' }}><strong>Nama:</strong> {selectedIntern.name}</p>
-                  <p style={{ margin: '4px 0' }}><strong>NIM/NISN:</strong> {selectedIntern.nim_nisn || '-'}</p>
                   <p style={{ margin: '4px 0' }}><strong>Instansi:</strong> {selectedIntern.institution || '-'}</p>
                   <p style={{ margin: '4px 0' }}><strong>Jurusan:</strong> {selectedIntern.major || '-'}</p>
                   <p style={{ margin: '4px 0' }}><strong>Divisi Penempatan:</strong> {selectedIntern.division || '-'}</p>

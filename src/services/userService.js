@@ -225,7 +225,6 @@ export const completeInternship = async (userId) => {
     startDate: userData.startDate || '',
     endDate: userData.endDate || '',
     division: userData.division || '',
-    nim_nisn: userData.nim_nisn || '',
     advisor: userData.advisor || '',
     no_hp_pembimbing: userData.no_hp_pembimbing || '',
     status: 'selesai',

@@ -8,7 +8,6 @@ import Modal from '../components/Modal';
 
 const initialFormData = {
   name: '',
-  nim_nisn: '',
   institution: '',
   division: 'TIK',
   major: '',
@@ -261,7 +260,6 @@ export default function UserManagement() {
   const handleEdit = (user) => {
     setFormData({
       name: user.name || '',
-      nim_nisn: user.nim_nisn || '',
       institution: user.institution || '',
       division: user.division || 'TIK',
       major: user.major || '',
@@ -861,7 +859,6 @@ export default function UserManagement() {
                 </th>
                 <th>No</th>
                 <th>Nama Peserta</th>
-                <th>NIM/NISN</th>
                 <th>Instansi Asal</th>
                 <th>Jurusan</th>
                 <th>Pembimbing</th>
@@ -877,7 +874,7 @@ export default function UserManagement() {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="14" className="table-empty">
+                  <td colSpan="13" className="table-empty">
                     {searchTerm ? 'Tidak ada peserta yang sesuai pencarian' : 'Belum ada peserta terdaftar'}
                   </td>
                 </tr>
@@ -893,7 +890,6 @@ export default function UserManagement() {
                     </td>
                     <td>{index + 1}</td>
                     <td className="td-name">{user.name}</td>
-                    <td>{user.nim_nisn ? user.nim_nisn : <span className="badge badge--danger">Belum Diisi</span>}</td>
                     <td>{user.institution ? user.institution : <span className="badge badge--danger">-</span>}</td>
                     <td>{user.major ? user.major : <span className="badge badge--danger">-</span>}</td>
                     <td>{user.advisor ? user.advisor : <span className="badge badge--danger">Belum Diisi</span>}</td>
@@ -991,30 +987,16 @@ export default function UserManagement() {
             />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="nim_nisn">NIM/NISN *</label>
-              <input
-                type="text"
-                id="nim_nisn"
-                name="nim_nisn"
-                value={formData.nim_nisn}
-                onChange={handleInputChange}
-                placeholder="Masukkan NIM atau NISN"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="institution">Instansi Asal</label>
-              <input
-                type="text"
-                id="institution"
-                name="institution"
-                value={formData.institution}
-                onChange={handleInputChange}
-                placeholder="Nama kampus/sekolah"
-              />
-            </div>
+          <div className="form-group">
+            <label htmlFor="institution">Instansi Asal</label>
+            <input
+              type="text"
+              id="institution"
+              name="institution"
+              value={formData.institution}
+              onChange={handleInputChange}
+              placeholder="Nama kampus/sekolah"
+            />
           </div>
 
           <div className="form-group">
