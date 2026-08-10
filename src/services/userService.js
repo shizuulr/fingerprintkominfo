@@ -137,6 +137,20 @@ export const registerUserAndRequestEnroll = async (userData) => {
   return { id: docRef.id, ...userData };
 };
 
+// Simpan data peserta saja tanpa memulai proses enroll fingerprint.
+// Status: 'belum_enroll' — fingerprint akan didaftarkan nanti secara terpisah.
+export const addUserOnly = async (userData) => {
+  const docRef = await addDoc(collection(db, USERS_COLLECTION), {
+    ...userData,
+    fingerprintId: null,
+    status: 'belum_enroll',
+    registeredAt: Timestamp.fromDate(new Date()),
+    isActive: true,
+  });
+  return { id: docRef.id, ...userData };
+};
+
+
 // --- CRUD JURUSAN (MAJORS) ---
 export const addMajor = async (name) => {
   const docRef = await addDoc(collection(db, 'majors'), { name });

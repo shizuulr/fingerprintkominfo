@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LuPlus, LuPencil, LuTrash2, LuSearch, LuFingerprint, LuPrinter, LuSettings, LuCheck, LuRefreshCw } from 'react-icons/lu';
-import { registerUserAndRequestEnroll, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor, completeInternship } from '../services/userService';
+import { addUserOnly, registerUserAndRequestEnroll, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor, completeInternship } from '../services/userService';
 import { getAttendanceByFingerprintId } from '../services/attendanceService';
 import { getAllSidediLocations } from '../services/sidediService';
 import { publishEnrollRequest, publishDeleteRequest, publishClearAllRequest, registerDeleteResultCallback, unregisterDeleteResultCallback } from '../components/MqttListener';
@@ -129,18 +129,9 @@ export default function UserManagement() {
         setEditingId(null);
         fetchUsers();
       } else {
-        // Pendaftaran baru - simpan dulu, lalu minta ESP32 melakukan enroll
-        const user = await registerUserAndRequestEnroll(formattedData);
-        const terkirim = publishEnrollRequest(user.id, formData.name);
-
-        if (terkirim) {
-          setSuccessMsg(`${formData.name} berhasil didaftarkan!`);
-          setInfoMsg(`Silakan tempelkan jari ${formData.name} di alat fingerprint sekarang untuk menyelesaikan pendaftaran.`);
-        } else {
-          setSuccessMsg(`${formData.name} tersimpan, tapi alat belum terhubung.`);
-          setInfoMsg('Pastikan alat fingerprint menyala dan terhubung internet, lalu minta peserta menempelkan jari secara manual saat alat siap.');
-        }
-
+        // Pendaftaran baru - simpan data saja, enroll fingerprint dilakukan terpisah
+        await addUserOnly(formattedData);
+        setSuccessMsg(`Data ${formData.name} berhasil disimpan! Lakukan pendaftaran fingerprint saat peserta sudah hadir.`);
         setIsModalOpen(false);
         setFormData(initialFormData);
         fetchUsers();
@@ -233,6 +224,26 @@ export default function UserManagement() {
       } catch (err) {
         alert('Gagal mengonfirmasi selesai magang: ' + err.message);
       }
+    }
+  };
+
+  // Daftarkan fingerprint untuk peserta yang statusnya 'belum_enroll'.
+  // Ubah status ke 'menunggu_enroll' lalu kirim MQTT enroll_request ke ESP32.
+  const handleEnrollFingerprint = async (user) => {
+    if (!window.confirm(`Daftarkan fingerprint untuk "${user.name}"?\n\nPastikan peserta sudah hadir dan siap menempelkan jari di alat fingerprint.`)) return;
+    try {
+      await updateUser(user.id, { status: 'menunggu_enroll', fingerprintId: null });
+      const terkirim = publishEnrollRequest(user.id, user.name);
+      if (terkirim) {
+        setSuccessMsg(`Permintaan enroll untuk ${user.name} berhasil dikirim!`);
+        setInfoMsg(`Silakan minta ${user.name} menempelkan jari di alat fingerprint sekarang.`);
+      } else {
+        setSuccessMsg(`Status ${user.name} diubah ke "Menunggu Enroll".`);
+        setInfoMsg('Alat fingerprint belum terhubung. Pastikan alat menyala dan terhubung internet, lalu coba lagi.');
+      }
+      fetchUsers();
+    } catch (err) {
+      setError('Gagal memulai enroll: ' + err.message);
     }
   };
 
@@ -786,8 +797,11 @@ export default function UserManagement() {
         </span>
       );
     }
-    // default: menunggu_enroll
-    return <span className="badge badge--warning">Menunggu Tempel Jari</span>;
+    if (user.status === 'menunggu_enroll') {
+      return <span className="badge badge--warning">Menunggu Tempel Jari</span>;
+    }
+    // belum_enroll (default untuk pendaftaran baru)
+    return <span className="badge" style={{ backgroundColor: '#6b7280', color: 'white' }}>Belum Enroll</span>;
   };
 
   return (
@@ -905,6 +919,17 @@ export default function UserManagement() {
                     <td>{renderStatusEnroll(user)}</td>
                     <td>
                       <div className="action-buttons">
+                        {/* Tombol Daftarkan Fingerprint: hanya muncul jika belum enroll */}
+                        {user.status === 'belum_enroll' && (
+                          <button
+                            className="btn btn--icon"
+                            onClick={() => handleEnrollFingerprint(user)}
+                            title="Daftarkan Fingerprint"
+                            style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+                          >
+                            <LuFingerprint />
+                          </button>
+                        )}
                         {user.status === 'gagal_enroll' && (
                           <button
                             className="btn btn--icon"
@@ -970,7 +995,7 @@ export default function UserManagement() {
 
           {!editingId && (
             <div className="alert alert--info">
-              <LuFingerprint /> Setelah didaftarkan, peserta perlu menempelkan jari di alat fingerprint untuk menyelesaikan pendaftaran. ID Fingerprint akan didapat otomatis.
+              <LuFingerprint /> Data peserta akan disimpan terlebih dahulu. Pendaftaran fingerprint dapat dilakukan nanti melalui tombol <strong>🟣 Daftarkan Fingerprint</strong> di tabel, saat peserta sudah hadir.
             </div>
           )}
 
@@ -1107,7 +1132,7 @@ export default function UserManagement() {
               Batal
             </button>
             <button type="submit" className="btn btn--primary" disabled={loading}>
-              {loading ? 'Menyimpan...' : editingId ? 'Perbarui' : 'Daftarkan'}
+              {loading ? 'Menyimpan...' : editingId ? 'Perbarui' : 'Simpan Data'}
             </button>
           </div>
         </form>
