@@ -533,10 +533,10 @@ export default function SidediInternship() {
                                         {u.institution} — {u.major || u.division}
                                       </div>
                                     </td>
-                                    <td style={{ padding: '8px 16px', borderBottom: ui < d.peserta.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                                    <td style={{ padding: '8px 16px', borderBottom: ui < d.peserta.length - 1 ? '1px solid var(--border-color)' : 'none', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'left', width: '160px' }}>
                                       HP: {u.phone || '-'}
                                     </td>
-                                    <td style={{ padding: '8px 8px 8px 0', borderBottom: ui < d.peserta.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none', textAlign: 'right' }}>
+                                    <td style={{ padding: '8px 8px 8px 0', borderBottom: ui < d.peserta.length - 1 ? '1px solid var(--border-color)' : 'none', textAlign: 'right', width: '50px' }}>
                                       <button
                                         className="btn btn--icon btn--delete"
                                         onClick={() => handleRemoveParticipant(d.id, u.id)}
@@ -594,11 +594,11 @@ export default function SidediInternship() {
               </div>
             </div>
 
-            <div className="table-container" style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+            <div className="table-container custom-schedule-scroll" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
               <table className="schedule-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '800px' }}>
                 <thead>
                   <tr>
-                    <th style={{ padding: '12px 15px', borderBottom: '2px solid var(--border-color)', borderRight: '2px solid var(--border-color)', textAlign: 'left', minWidth: '220px', position: 'sticky', left: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 2, boxShadow: '4px 0 8px rgba(0,0,0,0.1)' }}>
+                    <th style={{ padding: '12px 15px', borderBottom: '3px solid var(--color-primary-dark)', borderRight: '3px solid var(--color-primary-dark)', textAlign: 'left', minWidth: '220px', position: 'sticky', left: 0, top: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 3, boxShadow: '4px 4px 8px rgba(0,0,0,0.1)' }}>
                       Data Peserta
                     </th>
                     {daysArray.map(day => {
@@ -612,8 +612,10 @@ export default function SidediInternship() {
                       else if (special) bgColor = 'rgba(16,185,129,0.1)';
                       const textColor = (weekend || holiday) ? (isCuti ? '#ca8a04' : '#ef4444') : special ? '#059669' : 'var(--text-secondary)';
 
+                      const combinedBg = bgColor !== 'transparent' ? `linear-gradient(${bgColor}, ${bgColor}), var(--bg-card)` : 'var(--bg-card)';
+
                       return (
-                        <th key={day} style={{ padding: '6px 4px', borderBottom: '2px solid var(--border-color)', borderRight: '1px solid var(--border-color)', textAlign: 'center', minWidth: '46px', fontSize: '11px', backgroundColor: bgColor }} title={holiday ? `${holiday.keterangan} (${holiday.jenis === 'cuti_bersama' ? 'Cuti Bersama' : 'Libur Nasional'})` : special ? special.keterangan : weekend ? 'Hari Libur' : ''}>
+                        <th key={day} style={{ padding: '6px 4px', borderBottom: '3px solid var(--color-primary-dark)', borderRight: '2px solid rgba(148,163,184,0.3)', textAlign: 'center', minWidth: '46px', fontSize: '11px', position: 'sticky', top: 0, zIndex: 2, background: combinedBg }} title={holiday ? `${holiday.keterangan} (${holiday.jenis === 'cuti_bersama' ? 'Cuti Bersama' : 'Libur Nasional'})` : special ? special.keterangan : weekend ? 'Hari Libur' : ''}>
                           <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{day}</div>
                           <div style={{ fontSize: '10px', color: textColor, marginTop: '1px', fontWeight: weekend || holiday || special ? '700' : 'normal' }}>
                             {getDayName(currentYear, currentMonth, day)}
@@ -648,7 +650,7 @@ export default function SidediInternship() {
                       const { desaName, kecamatanName } = getUserDesaInfo(user.id);
                       return (
                         <tr key={user.id}>
-                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-color)', borderRight: '2px solid var(--border-color)', position: 'sticky', left: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 1, boxShadow: '4px 0 8px rgba(0,0,0,0.05)' }}>
+                          <td style={{ padding: '8px 12px', borderBottom: '2px solid rgba(148,163,184,0.3)', borderRight: '3px solid var(--color-primary-dark)', position: 'sticky', left: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 1, boxShadow: '4px 0 8px rgba(0,0,0,0.05)' }}>
                             <div style={{ fontWeight: '600', color: 'var(--text-primary)', fontSize: '13px' }}>{user.name}</div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{user.institution} — {user.major || user.division}</div>
                             <div style={{ fontSize: '11px', color: '#10b981', marginTop: '2px' }}>{desaName} (Kec. {kecamatanName})</div>
@@ -665,7 +667,7 @@ export default function SidediInternship() {
                             if (holiday) cellBg = holiday.jenis === 'cuti_bersama' ? 'rgba(234,179,8,0.06)' : 'rgba(239,68,68,0.06)';
 
                             return (
-                              <td key={day} style={{ padding: '3px', borderBottom: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', textAlign: 'center', backgroundColor: cellBg }}>
+                              <td key={day} style={{ padding: '3px', borderBottom: '2px solid rgba(148,163,184,0.3)', borderRight: '2px solid rgba(148,163,184,0.3)', textAlign: 'center', backgroundColor: cellBg }}>
                                 <select
                                   value={value}
                                   onChange={e => handleScheduleChange(user.id, day, e.target.value)}
