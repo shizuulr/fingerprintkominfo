@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { LuCalendarDays, LuMapPin, LuUsers, LuSave, LuPrinter, LuPlus, LuTrash2 } from 'react-icons/lu';
+import { useState, useEffect, Fragment } from 'react';
+import { LuCalendarDays, LuMapPin, LuUsers, LuSave, LuPrinter, LuPlus, LuTrash2, LuSearch } from 'react-icons/lu';
 import {
   getAllSidediLocations,
   ensureDesaExists,
@@ -37,6 +37,7 @@ export default function SidediInternship() {
   const [isAgendaModalOpen, setIsAgendaModalOpen] = useState(false);
   const [agendaForm, setAgendaForm] = useState({ tanggal: '', keterangan: '', jenis: 'agenda_penting' });
   const [agendaTrigger, setAgendaTrigger] = useState(0);
+  const [scheduleSearchTerm, setScheduleSearchTerm] = useState('');
 
   // ── Load holidays ──
   useEffect(() => {
@@ -142,6 +143,15 @@ export default function SidediInternship() {
     }
     return { desaName: loc.name || '-', kecamatanName: loc.kecamatanName || '-' };
   };
+
+  const filteredAssignedUsers = assignedUsersList.filter(u => {
+    if (!scheduleSearchTerm) return true;
+    const { desaName, kecamatanName } = getUserDesaInfo(u.id);
+    const searchLower = scheduleSearchTerm.toLowerCase();
+    return u.name.toLowerCase().includes(searchLower) ||
+           desaName.toLowerCase().includes(searchLower) ||
+           kecamatanName.toLowerCase().includes(searchLower);
+  });
 
   // ── Management actions ──
   const handleOpenAddParticipant = async () => {
@@ -594,6 +604,17 @@ export default function SidediInternship() {
               </div>
             </div>
 
+            <div className="search-box" style={{ marginBottom: '16px' }}>
+              <LuSearch className="search-icon" />
+              <input
+                type="text"
+                placeholder="Cari berdasarkan nama peserta, nama desa, atau kecamatan..."
+                value={scheduleSearchTerm}
+                onChange={(e) => setScheduleSearchTerm(e.target.value)}
+                className="search-input"
+              />
+            </div>
+
             <div className="table-container custom-schedule-scroll" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '65vh', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
               <table className="schedule-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '800px' }}>
                 <thead>
@@ -639,15 +660,30 @@ export default function SidediInternship() {
                   </tr>
                 </thead>
                 <tbody>
-                  {assignedUsersList.length === 0 ? (
+                  {filteredAssignedUsers.length === 0 ? (
                     <tr>
                       <td colSpan={daysInMonth + 1} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-                        Belum ada peserta yang ditugaskan ke SIDEDI.
+                        Belum ada peserta yang sesuai dengan pencarian atau ditugaskan.
                       </td>
                     </tr>
                   ) : (
-                    assignedUsersList.map(user => {
-                      const { desaName, kecamatanName } = getUserDesaInfo(user.id);
+                    (() => {
+                      const groupedUsers = filteredAssignedUsers.reduce((acc, user) => {
+                        const div = user.division || 'Belum Ditentukan';
+                        if (!acc[div]) acc[div] = [];
+                        acc[div].push(user);
+                        return acc;
+                      }, {});
+
+                      return Object.keys(groupedUsers).sort().map(division => (
+                        <Fragment key={division}>
+                          <tr>
+                            <td colSpan={daysInMonth + 1} style={{ padding: '8px 12px', backgroundColor: 'rgba(99, 102, 241, 0.1)', fontWeight: 'bold', borderBottom: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)', color: 'var(--color-primary-light)', position: 'sticky', left: 0, zIndex: 1 }}>
+                              Bidang / Divisi: {division}
+                            </td>
+                          </tr>
+                          {groupedUsers[division].map(user => {
+                            const { desaName, kecamatanName } = getUserDesaInfo(user.id);
                       return (
                         <tr key={user.id}>
                           <td style={{ padding: '8px 12px', borderBottom: '2px solid rgba(148,163,184,0.3)', borderRight: '3px solid var(--color-primary-dark)', position: 'sticky', left: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 1, boxShadow: '4px 0 8px rgba(0,0,0,0.05)' }}>
@@ -696,11 +732,44 @@ export default function SidediInternship() {
                               </td>
                             );
                           })}
-                        </tr>
-                      );
-                    })
+                        </Fragment>
+                      ));
+                    })()
                   )}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td style={{ padding: '8px 15px', fontWeight: 'bold', textAlign: 'right', borderTop: '3px solid var(--color-primary-dark)', borderRight: '3px solid var(--color-primary-dark)', position: 'sticky', left: 0, bottom: 0, backgroundColor: 'var(--bg-sidebar)', zIndex: 3, boxShadow: '4px -4px 8px rgba(0,0,0,0.1)', color: 'var(--text-primary)' }}>
+                      Total Kehadiran
+                    </td>
+                    {daysArray.map(day => {
+                      const dateStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                      let totalD = 0;
+                      let totalK = 0;
+                      // Hitung total dari SEMUA peserta yg di-assign, bukan cuma yg di-filter
+                      assignedUsersList.forEach(user => {
+                        const val = schedules[`${user.id}_${dateStr}`];
+                        if (val === 'sidedi') totalD++;
+                        if (val === 'kominfo') totalK++;
+                      });
+                      const weekend = isWeekend(day);
+                      const holiday = getHolidayForDay(day);
+                      let cellBg = 'var(--bg-card)';
+                      if (weekend) cellBg = 'rgba(107,114,128,0.1)';
+                      if (holiday) cellBg = holiday.jenis === 'cuti_bersama' ? 'rgba(234,179,8,0.1)' : 'rgba(239,68,68,0.1)';
+
+                      const combinedBg = cellBg !== 'var(--bg-card)' ? `linear-gradient(${cellBg}, ${cellBg}), var(--bg-card)` : 'var(--bg-card)';
+
+                      return (
+                        <td key={day} style={{ padding: '6px 2px', borderTop: '3px solid var(--color-primary-dark)', borderRight: '2px solid rgba(148,163,184,0.3)', textAlign: 'center', background: combinedBg, fontSize: '11px', fontWeight: 'bold', position: 'sticky', bottom: 0, zIndex: 2, boxShadow: '0 -4px 8px rgba(0,0,0,0.05)' }}>
+                          <div style={{ color: '#10b981', display: totalD > 0 ? 'block' : 'none' }}>D: {totalD}</div>
+                          <div style={{ color: '#3b82f6', display: totalK > 0 ? 'block' : 'none' }}>K: {totalK}</div>
+                          {totalD === 0 && totalK === 0 && <div style={{ color: 'var(--text-muted)' }}>-</div>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
               </table>
             </div>
 

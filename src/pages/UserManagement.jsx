@@ -763,6 +763,8 @@ export default function UserManagement() {
   const filteredUsers = users.filter((user) =>
     user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.institution?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.major?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.division?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     String(user.fingerprintId).includes(searchTerm)
   );
 
