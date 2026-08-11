@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { LuSearch, LuCalendarDays, LuTrash2, LuUser, LuX } from 'react-icons/lu';
+import { LuSearch, LuCalendarDays, LuTrash2, LuUser, LuX, LuPrinter } from 'react-icons/lu';
 import { getAttendanceByDate, getAttendanceByDateRange, deleteAttendanceLog, deleteAllAttendanceLogs, getAttendanceStatus } from '../services/attendanceService';
-import { getCompletedInterns } from '../services/userService';
+import { getCompletedInterns, deleteCompletedIntern } from '../services/userService';
 import StatusBadge from '../components/StatusBadge';
 
 export default function AttendanceHistory() {
@@ -79,6 +79,315 @@ export default function AttendanceHistory() {
       } catch (err) {
         alert('Gagal mereset data absensi: ' + err.message);
       }
+    }
+  };
+
+  const handleDeleteCompleted = async (id, name) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data riwayat selesai magang untuk "${name}"? Tindakan ini tidak bisa dibatalkan.`)) {
+      try {
+        await deleteCompletedIntern(id);
+        fetchCompleted();
+      } catch (err) {
+        alert('Gagal menghapus data: ' + err.message);
+      }
+    }
+  };
+
+  const handlePrintCompletedRecap = (intern) => {
+    try {
+      const data = intern.rekap_harian || [];
+      
+      let totalSidedi = 0;
+      let totalKominfo = 0;
+      
+      data.forEach(item => {
+         if (item.location === 'sidedi') {
+            totalSidedi++;
+         }
+         else if (item.status && item.status.includes('Hadir')) totalKominfo++;
+      });
+      
+      const printWindow = window.open('', '_blank');
+      
+      const today = new Date().toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+
+      const tableRows = data.length === 0 
+        ? `<tr><td colspan="6" style="text-align: center; padding: 12px; border: 1px solid #ddd;">Tidak ada data kehadiran</td></tr>`
+        : data.map((item, index) => {
+            const dateObj = new Date(item.date + 'T00:00:00');
+            const formattedDate = dateObj.toLocaleDateString('id-ID', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
+            const checkInStr = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+            const checkOutStr = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+            const locationStr = item.location === 'sidedi' ? 'SIDEDI' : 'KOMINFO';
+            const isSidedi = item.location === 'sidedi';
+            const progressInfo = isSidedi && item.progress !== undefined && item.progress !== null ? ` [Prog: ${item.progress}%]` : '';
+            return `
+              <tr>
+                <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${formattedDate}</td>
+                <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${checkInStr}</td>
+                <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${checkOutStr}</td>
+                <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${locationStr}</td>
+                <td style="text-align: center; padding: 8px; border: 1px solid #ddd; font-weight: bold; color: ${item.status && item.status.includes('Hadir') ? 'green' : 'red'};">${item.status}${progressInfo}</td>
+              </tr>
+            `;
+          }).join('');
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Rekap Absensi - ${intern.name}</title>
+            <style>
+              @page {
+                size: portrait;
+                margin: 20mm 15mm;
+              }
+              body {
+                font-family: Arial, sans-serif;
+                margin: 0;
+                color: #222;
+                font-size: 12px;
+                line-height: 1.5;
+              }
+              .kop-surat {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 5px;
+                position: relative;
+              }
+              .kop-logo {
+                width: 70px;
+                height: auto;
+                position: absolute;
+                left: 10px;
+              }
+              .kop-text {
+                text-align: center;
+                width: 100%;
+              }
+              .kop-text h3 {
+                margin: 0;
+                font-size: 16px;
+                font-weight: normal;
+                letter-spacing: 0.5px;
+              }
+              .kop-text h2 {
+                margin: 4px 0;
+                font-size: 18px;
+                font-weight: bold;
+                letter-spacing: 0.5px;
+              }
+              .kop-text p {
+                margin: 2px 0;
+                font-size: 11px;
+                line-height: 1.3;
+              }
+              .kop-line {
+                border-bottom: 3px solid #000;
+                border-top: 1px solid #000;
+                padding: 1px 0;
+                margin-top: 15px;
+                margin-bottom: 25px;
+              }
+              .report-title {
+                text-align: center;
+                margin-bottom: 25px;
+                font-size: 16px;
+                font-weight: bold;
+                text-decoration: underline;
+                text-transform: uppercase;
+              }
+              .info-table {
+                width: 100%;
+                margin-bottom: 20px;
+                font-size: 12px;
+                border-collapse: collapse;
+              }
+              .info-table td {
+                padding: 5px 0;
+                vertical-align: top;
+              }
+              .info-table td.label {
+                width: 130px;
+                font-weight: bold;
+              }
+              .info-table td.colon {
+                width: 15px;
+                text-align: center;
+              }
+              .data-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+                font-size: 11px;
+              }
+              .data-table th, .data-table td {
+                border: 1px solid #999;
+                padding: 8px 6px;
+              }
+              .data-table th {
+                background-color: #f8f9fa;
+                font-weight: bold;
+                text-align: center;
+                text-transform: uppercase;
+              }
+              .summary-box {
+                margin-top: 25px;
+                padding: 12px 15px;
+                background-color: #f8f9fa;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 12px;
+              }
+              .summary-box strong {
+                display: block;
+                margin-bottom: 5px;
+                font-size: 13px;
+              }
+              .footer-section {
+                margin-top: 40px;
+                display: flex;
+                justify-content: space-between;
+              }
+              .print-date {
+                text-align: right;
+                margin-bottom: 60px;
+              }
+              .signature-container {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+              }
+              .signature-box {
+                text-align: center;
+                width: 200px;
+              }
+              .signature-box.right {
+                margin-left: auto;
+              }
+              .signature-space {
+                height: 70px;
+              }
+              .signature-name {
+                font-weight: bold;
+                text-decoration: underline;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="kop-surat">
+              <img src="${window.location.origin}/logo-temanggung.png" alt="Logo Pemkab Temanggung" class="kop-logo">
+              <div class="kop-text">
+                <h3>PEMERINTAH KABUPATEN TEMANGGUNG</h3>
+                <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
+                <p>Jalan Jenderal Sudirman No. 41-42 Temanggung Kode Pos 56216</p>
+                <p>Telepon (0293) 4961389, Surat Elektronik: kominfo@temanggungkab.go.id</p>
+                <p>Laman: kominfo.temanggungkab.go.id</p>
+              </div>
+            </div>
+            <div class="kop-line"></div>
+            
+            <div class="report-title">LAPORAN REKAPITULASI KEHADIRAN MAGANG</div>
+            
+            <table class="info-table">
+              <tr>
+                <td class="label">Nama Peserta</td>
+                <td class="colon">:</td>
+                <td style="font-weight: bold; font-size: 13px;">${intern.name}</td>
+              </tr>
+              <tr>
+                <td class="label">Instansi Asal</td>
+                <td class="colon">:</td>
+                <td>${intern.institution || '-'}</td>
+              </tr>
+              <tr>
+                <td class="label">Jurusan</td>
+                <td class="colon">:</td>
+                <td>${intern.major || '-'}</td>
+              </tr>
+              <tr>
+                <td class="label">Divisi / Penempatan</td>
+                <td class="colon">:</td>
+                <td>${intern.division || '-'}</td>
+              </tr>
+              <tr>
+                <td class="label">Periode Magang</td>
+                <td class="colon">:</td>
+                <td>${intern.startDate ? `${intern.startDate} s/d ${intern.endDate}` : '-'}</td>
+              </tr>
+              <tr>
+                <td class="label">Pembimbing</td>
+                <td class="colon">:</td>
+                <td>${intern.advisor || '-'} (${intern.no_hp_pembimbing || '-'})</td>
+              </tr>
+            </table>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th style="width: 180px;">Hari & Tanggal</th>
+                  <th>Jam Masuk</th>
+                  <th>Jam Pulang</th>
+                  <th>Lokasi Penugasan</th>
+                  <th>Status Kehadiran</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+
+            <div class="summary-box">
+              <strong>RINGKASAN KEHADIRAN:</strong>
+              Total Kehadiran di Kantor (KOMINFO): <strong>${totalKominfo} Hari</strong><br/>
+              Total Kehadiran di Lapangan (SIDEDI): <strong>${totalSidedi} Hari</strong><br/>
+              Total Ketidakhadiran (Izin): <strong>${intern.totalIzin || 0} Hari</strong><br/>
+              Total Ketidakhadiran (Alfa): <strong>${intern.totalAlpa || 0} Hari</strong><br/>
+              Total Hari Efektif Magang: <strong>${data.length} Hari</strong>
+            </div>
+
+            <div class="signature-container" style="margin-top: 30px;">
+              <div class="signature-box">
+                <p>Mengetahui,</p>
+                <p>Pembimbing Lapangan</p>
+                <div class="signature-space"></div>
+                <p class="signature-name">${intern.advisor || '...........................................'}</p>
+                <p>NIP. ...........................................</p>
+              </div>
+              <div class="signature-box right">
+                <p>Temanggung, ${today}</p>
+                <p>Peserta Magang,</p>
+                <div class="signature-space"></div>
+                <p class="signature-name">${intern.name}</p>
+                <p>NIM/NISN. -</p>
+              </div>
+            </div>
+
+            <script>
+              window.onload = function() {
+                window.print();
+                window.onafterprint = function() {
+                  window.close();
+                }
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      alert('Gagal mencetak rekap: ' + err.message);
     }
   };
 
@@ -320,13 +629,28 @@ export default function AttendanceHistory() {
                         <span style={{ color: '#6366f1', fontWeight: 'bold', fontSize: '11px', marginRight: '6px' }}>I: {intern.totalIzin || 0}</span>
                         <span style={{ color: 'red', fontWeight: 'bold', fontSize: '11px' }}>A: {intern.totalAlpa || 0}</span>
                       </td>
-                      <td>
+                      <td style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                           className="btn btn--primary"
                           onClick={() => setSelectedIntern(intern)}
-                          style={{ padding: '6px 12px', fontSize: '11px' }}
+                          style={{ padding: '5px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}
                         >
                           Detail Riwayat
+                        </button>
+                        <button
+                          className="btn"
+                          onClick={() => handlePrintCompletedRecap(intern)}
+                          style={{ padding: '5px 10px', fontSize: '11px', backgroundColor: 'var(--color-success)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                          title="Cetak Laporan Rekapitulasi"
+                        >
+                          <LuPrinter size={12} /> Cetak Rekap
+                        </button>
+                        <button
+                          className="btn btn--danger"
+                          onClick={() => handleDeleteCompleted(intern.id, intern.name)}
+                          style={{ padding: '5px 10px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}
+                        >
+                          <LuTrash2 size={12} /> Hapus
                         </button>
                       </td>
                     </tr>

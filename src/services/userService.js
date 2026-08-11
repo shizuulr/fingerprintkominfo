@@ -263,3 +263,8 @@ export const getCompletedInterns = async () => {
     completedAt: doc.data().completedAt?.toDate?.() || null
   })).sort((a, b) => b.name.localeCompare(a.name));
 };
+
+export const deleteCompletedIntern = async (id) => {
+  await deleteDoc(doc(db, 'riwayat_peserta_magang', id));
+  return { id };
+};

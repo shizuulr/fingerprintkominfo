@@ -732,8 +732,11 @@ export default function SidediInternship() {
                               </td>
                             );
                           })}
-                        </Fragment>
-                      ));
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ));
                     })()
                   )}
                 </tbody>
