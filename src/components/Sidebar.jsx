@@ -1,7 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSun, LuMoon, LuSettings, LuPanelLeftClose, LuPanelLeftOpen } from 'react-icons/lu';
-import { useTheme } from '../hooks/useTheme';
+import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSettings, LuPanelLeftClose, LuPanelLeftOpen } from 'react-icons/lu';
 
 const menuItems = [
   { path: '/', icon: <LuLayoutDashboard />, label: 'Dashboard' },
@@ -12,7 +11,7 @@ const menuItems = [
 ];
 
 export default function Sidebar({ collapsed = false, onToggle, zoomLevel }) {
-  const { theme, toggleTheme } = useTheme();
+
 
   // ── Tap 5x pada judul untuk mengaktifkan debug mode ──
   const tapCountRef = useRef(0);
@@ -79,18 +78,11 @@ export default function Sidebar({ collapsed = false, onToggle, zoomLevel }) {
 
         <div className="sidebar-footer">
           {/* Zoom indicator */}
-          {zoomLevel !== undefined && zoomLevel !== 100 && !collapsed && (
+          {zoomLevel !== undefined && zoomLevel !== 100 && (
             <span className="zoom-indicator" title="Zoom Level">
               {zoomLevel}%
             </span>
           )}
-          <button
-            className="theme-toggle"
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Ganti ke Mode Terang' : 'Ganti ke Mode Gelap'}
-          >
-            {theme === 'dark' ? <LuSun /> : <LuMoon />}
-          </button>
           {!collapsed && (
             <>
               <p>© 2026 Sistem Absensi</p>

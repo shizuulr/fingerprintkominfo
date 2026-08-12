@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LuX, LuTerminal, LuRefreshCw, LuCalendar, LuSmartphone, LuGlobe, LuWifi, LuWifiOff } from 'react-icons/lu';
+import { LuTerminal, LuRefreshCw, LuCalendar, LuSmartphone, LuWifi, LuWifiOff } from 'react-icons/lu';
 import Modal from './Modal';
 import { getDebugLogs, analyzeDebugLog } from '../services/debugService';
 

@@ -75,7 +75,7 @@ import { deleteUser } from '../services/userService.js';
  * Replika TEPAT logika confirmDelete() asli dari UserManagement.jsx (SEBELUM perbaikan).
  * Tidak ada panggilan MQTT — itulah bugnya.
  */
-async function confirmDelete_original(deletingUser, { publishDeleteRequest } = {}) {
+async function confirmDelete_original(deletingUser) {
   if (!deletingUser) return { mqttSent: false, firestoreDeleted: false };
 
   // === KODE ASLI (TIDAK DIUBAH) ===

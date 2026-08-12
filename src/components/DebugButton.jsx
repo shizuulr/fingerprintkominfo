@@ -42,6 +42,14 @@ export default function DebugButton() {
     }
   }, []);
 
+  // ── Toast helper ──
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  }, []);
+
   // ── Dengarkan event dari Sidebar (tap 5x) atau Settings ──
   useEffect(() => {
     const handleActivate = () => {
@@ -61,13 +69,7 @@ export default function DebugButton() {
       window.removeEventListener('debug-mode-activated', handleActivate);
       window.removeEventListener('debug-mode-deactivated', handleDeactivate);
     };
-  }, []);
-
-  // ── Toast helper ──
-  const showToast = useCallback((message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+  }, [showToast]);
 
   // ── Handler: klik tombol debug ──
   const handleDebugClick = async () => {

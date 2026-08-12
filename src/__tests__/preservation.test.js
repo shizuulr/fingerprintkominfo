@@ -78,31 +78,6 @@ import {
 
 import { processAttendanceScan } from '../services/attendanceService.js';
 
-// handleEnrollResult adalah fungsi internal di MqttListener.jsx.
-// Kita ekstrak logikanya sebagai fungsi murni agar bisa diuji tanpa React/DOM.
-// Ini mereplikasi persis logika handleEnrollResult() dari MqttListener.jsx.
-async function handleEnrollResult_replica(data) {
-  const { docId, success, fingerprintId } = data;
-
-  if (!docId) {
-    return { error: 'no-docId' };
-  }
-
-  if (success) {
-    await mockUpdateDoc(mockDoc({}, 'users', docId), {
-      fingerprintId: Number(fingerprintId),
-      status: 'aktif',
-      enrolledAt: expect.any(Object),
-    });
-    return { updated: true, fingerprintId: Number(fingerprintId), status: 'aktif' };
-  } else {
-    await mockUpdateDoc(mockDoc({}, 'users', docId), {
-      status: 'gagal_enroll',
-    });
-    return { updated: true, status: 'gagal_enroll' };
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Setup: Reset semua mock sebelum setiap test
 // ---------------------------------------------------------------------------

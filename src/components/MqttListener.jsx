@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useRef } from 'react';
 import mqtt from 'mqtt';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -115,14 +116,18 @@ async function handleScanMessage(data) {
     return;
   }
 
-  await addDoc(collection(db, 'raw_scans'), {
-    fingerprintId: Number(data.fingerprintId),
-    status: 'pending',
-    receivedAt: Timestamp.fromDate(new Date()),
-    source: 'mqtt',
-  });
-
-  console.log('MQTT: scan berhasil diteruskan ke raw_scans');
+  try {
+    await addDoc(collection(db, 'raw_scans'), {
+      fingerprintId: Number(data.fingerprintId),
+      status: 'pending',
+      receivedAt: Timestamp.fromDate(new Date()),
+      source: 'mqtt',
+    });
+    console.log('MQTT: scan berhasil diteruskan ke raw_scans');
+  } catch (error) {
+    console.error('MQTT: gagal menyimpan scan ke raw_scans', error);
+    setFingerprintStatus('ERROR');
+  }
 }
 
 async function handleEnrollResult(data) {
@@ -133,23 +138,28 @@ async function handleEnrollResult(data) {
     return;
   }
 
-  if (success) {
-    await updateDoc(doc(db, 'users', docId), {
-      fingerprintId: Number(fingerprintId),
-      status: 'aktif',
-      enrolledAt: Timestamp.fromDate(new Date()),
-    });
-    console.log(`MQTT: enroll berhasil, user ${docId} -> fingerprintId ${fingerprintId}`);
-  } else {
-    await updateDoc(doc(db, 'users', docId), {
-      status: 'gagal_enroll',
-    });
-    console.log(`MQTT: enroll gagal untuk user ${docId}`);
+  try {
+    if (success) {
+      await updateDoc(doc(db, 'users', docId), {
+        fingerprintId: Number(fingerprintId),
+        status: 'aktif',
+        enrolledAt: Timestamp.fromDate(new Date()),
+      });
+      console.log(`MQTT: enroll berhasil, user ${docId} -> fingerprintId ${fingerprintId}`);
+    } else {
+      await updateDoc(doc(db, 'users', docId), {
+        status: 'gagal_enroll',
+      });
+      console.log(`MQTT: enroll gagal untuk user ${docId}`);
+    }
+  } catch (error) {
+    console.error(`MQTT: gagal update doc user ${docId}`, error);
+    setFingerprintStatus('ERROR');
   }
 }
 
 function handleDeleteResult(data) {
-  const { fingerprintId, success, error } = data;
+  const { fingerprintId, success } = data;
   console.log(`MQTT: delete_result diterima — ID ${fingerprintId}, sukses: ${success}`);
 
   // Hapus retained message di broker setelah ESP32 berhasil memproses delete.

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck, LuSettings, LuRefreshCw, LuCalendarDays, LuMapPin, LuBuilding2 } from 'react-icons/lu';
-import { subscribeToTodayAttendance, getTodayDate, isFriday, isOffDay, deleteAttendanceLog, confirmSidediAttendance, getAttendanceByDateRange, submitLeavePermission, submitTemporaryExit, submitTemporaryReturn, getAttendanceStatus } from '../services/attendanceService';
+import { LuUserCheck, LuClock, LuUserX, LuLogOut, LuTrash2, LuCheck, LuPrinter, LuX, LuShieldCheck, LuMapPin, LuBuilding2 } from 'react-icons/lu';
+import { subscribeToTodayAttendance, getTodayDate, isFriday, deleteAttendanceLog, confirmSidediAttendance, getAttendanceByDateRange, submitLeavePermission, submitTemporaryExit, submitTemporaryReturn, getAttendanceStatus } from '../services/attendanceService';
 import { getActiveUsers } from '../services/userService';
 import { getTodaySchedules } from '../services/sidediService';
 import StatsCard from '../components/StatsCard';
@@ -9,7 +9,6 @@ import { getDayType, syncHolidays, getCachedHolidays } from '../services/holiday
 
 export default function Dashboard() {
   const [attendance, setAttendance] = useState([]);
-  const [totalUsers, setTotalUsers] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidediSchedules, setSidediSchedules] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);

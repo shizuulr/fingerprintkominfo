@@ -33,7 +33,7 @@ async function processQueue() {
         transaction.update(scanRef, { status: 'processing' });
       });
       // Jika sampai di sini, client ini berhasil mengklaim scan
-    } catch (err) {
+    } catch (_err) {
       // Gagal klaim (sudah diklaim client lain atau sudah diproses), skip ke scan berikutnya
       continue;
     }

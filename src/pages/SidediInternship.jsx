@@ -86,6 +86,7 @@ export default function SidediInternship() {
 
   useEffect(() => {
     if (activeTab === 'schedule') fetchSchedules();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentMonth, currentYear]);
 
   const fetchData = async () => {
@@ -346,7 +347,7 @@ export default function SidediInternship() {
         <em>Dicetak pada: ${new Date().toLocaleString('id-ID')}</em>
       </div>`;
 
-    printWindow.document.write(`<html><head><title>Cetak Rekap Penjadwalan</title></head><body>${tableHtml}<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}<\/script></body></html>`);
+    printWindow.document.write(`<html><head><title>Cetak Rekap Penjadwalan</title></head><body>${tableHtml}<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script></body></html>`);
     printWindow.document.close();
   };
 

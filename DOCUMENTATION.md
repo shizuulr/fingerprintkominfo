@@ -677,3 +677,19 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
   - **`src/App.jsx`**: Pengelolaan state `sidebarCollapsed` dan `zoomLevel` yang tersimpan permanen di `localStorage`. Menambahkan listener event `wheel` (dengan `e.ctrlKey` & `{ passive: false }`) dan pintasan keyboard (`Ctrl +`, `Ctrl -`, `Ctrl 0`).
   - **`src/index.css`**: Penyesuaian responsif CSS untuk `.app-layout.sidebar-collapsed` dan animasi transisi lebar sidebar serta penyesuaian margin area konten utama (`.main-content`).
 
+### 20.6. Penyempurnaan Tata Letak, Error Handling & Pembersihan Linter (Zero Warnings)
+- **Latar Belakang**: Menyelesaikan sejumlah bug layout (seperti tinggi sidebar di mobile) serta membersihkan _codebase_ dari peringatan *linter* untuk mencegah kesalahan logika laten (contoh: *Temporal Dead Zone ReferenceError*).
+- **Implementasi Utama**:
+  - **Perbaikan UI & Tata Letak**: Modifikasi `index.css` untuk transisi `.sidebar` menggunakan `height: 100dvh` dengan fallback `@supports` ke `100vh` agar menghindari terpotongnya sidebar akibat address bar browser. Menambahkan _min-height_ di `.sidebar-footer` agar teks hak cipta tetap utuh walau dilakukan zoom-in maksimum, serta menstandarisasi penerapan zoom di tingkat `.app-layout` melalui *CSS variables*.
+  - **Proteksi Error (MQTT)**: Penambahan blok `try/catch` pada fungsi `addDoc` dan `updateDoc` untuk penanganan pesan MQTT (pada `MqttListener.jsx`), sehingga jika pengiriman ke Firestore gagal, sistem tidak lagi mengalami *silent error* tetapi akan memberikan log dan merubah status perangkat menjadi 'ERROR'.
+  - **Optimalisasi React Hooks & Linter**:
+    - **Pembersihan Modul**: Menghapus lebih dari 30 *linter warnings*, membuang import tidak terpakai, deklarasi state berlebih, serta memperbaiki sintaks usang pada berbagai halaman (`Dashboard.jsx`, `SidediInternship.jsx`, dll).
+    - **Temporal Dead Zone Fix**: Memperbaiki alur kerja *React Hooks* (pemindahan letak fungsi `useEffect` pasca inisialisasi parameter di `DebugButton.jsx` dan `SidediInternship.jsx`) agar menghindari *ReferenceError* (*blank screen crash*) di browser.
+    - **Pencegah Duplikasi Event**: Menerapkan pengecekan `window.__zoomListenersAdded` di `App.jsx` agar mencegah penumpukan event listener scroll zoom saat berhadapan dengan *Hot Module Replacement (HMR)* selama masa tahap *development*.
+
+### 20.7. Optimasi Performa & Code Splitting (Lazy Loading)
+- **Latar Belakang**: Menyelesaikan peringatan dari Vite Bundler terkait ukuran *chunk* JavaScript yang terlalu besar (>500 kB) pada satu file utama yang berpotensi melambatkan pemuatan (*initial load*) website pada perangkat berspesifikasi rendah atau jaringan lambat.
+- **Implementasi Utama**:
+  - **Dynamic Routing (React.lazy & Suspense)**: Mengubah sistem muat halaman pada `App.jsx`. Halaman seperti *UserManagement*, *Settings*, dan *SidediInternship* kini hanya akan diunduh oleh browser ketika pengguna mengunjungi rute tersebut.
+  - **Manual Chunks (Vite / Rolldown)**: Mengonfigurasi `build.rollupOptions.output.manualChunks` pada `vite.config.js` untuk memecah pustaka-pustaka pihak ketiga berukuran besar (Firebase SDK, MQTT.js, React-Icons) menjadi file `.js` terpisah (misal: `vendor-firebase.js`).
+  - **Hasil**: Berhasil menurunkan ukuran file bundel utama dari **1.269 kB** menjadi rata-rata **20-50 kB** per halaman, dan meloloskan aplikasi dari semua peringatan performa kompilasi.

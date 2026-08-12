@@ -568,6 +568,7 @@ body::before {
 .app-layout {
   display: flex;
   min-height: 100vh;
+  zoom: var(--app-zoom, 1);
 }
 
 .main-content {
@@ -585,7 +586,7 @@ body::before {
   left: 0;
   top: 0;
   width: var(--sidebar-width);
-  height: 100vh;
+  height: 100dvh;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--glass-border);
   display: flex;
@@ -594,12 +595,20 @@ body::before {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   transition: width var(--transition-base);
+  overflow: hidden;
+}
+
+@supports not (height: 100dvh) {
+  .sidebar {
+    height: 100vh;
+  }
 }
 
 .sidebar-brand {
   padding: var(--space-xl) var(--space-lg);
   text-align: center;
   border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -643,6 +652,8 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .sidebar-link {
@@ -703,28 +714,8 @@ body::before {
   padding: var(--space-lg);
   border-top: 1px solid var(--glass-border);
   text-align: center;
-}
-
-/* ── Theme Toggle Button ── */
-.theme-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: var(--bg-input);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 1.1rem;
-  transition: all var(--transition-base);
-}
-
-.theme-toggle:hover {
-  background: var(--bg-input-focus);
-  color: var(--text-primary);
-  border-color: var(--border-color-hover);
+  flex-shrink: 0;
+  min-height: 5rem;
 }
 
 .sidebar-footer p {

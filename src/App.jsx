@@ -1,15 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
-import Dashboard from './pages/Dashboard';
-import UserManagement from './pages/UserManagement';
-import AttendanceHistory from './pages/AttendanceHistory';
 import ScanProcessor from './components/ScanProcessor';
 import MqttListener from './components/MqttListener';
-import SidediInternship from './pages/SidediInternship';
-import Settings from './pages/Settings';
 import DebugButton from './components/DebugButton';
 import { initGlobalErrorHandler } from './services/debugService';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const UserManagement = lazy(() => import('./pages/UserManagement'));
+const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory'));
+const SidediInternship = lazy(() => import('./pages/SidediInternship'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 const ZOOM_MIN = 50;
 const ZOOM_MAX = 200;
@@ -74,12 +75,16 @@ export default function App() {
       }
     };
 
+    if (window.__zoomListenersAdded) return;
+    window.__zoomListenersAdded = true;
+
     window.addEventListener('wheel', handleWheel, { passive: false });
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('wheel', handleWheel);
       window.removeEventListener('keydown', handleKeyDown);
+      window.__zoomListenersAdded = false;
     };
   }, []);
 
@@ -90,16 +95,22 @@ export default function App() {
       <ScanProcessor />
       <MqttListener />
       <DebugButton />
-      <div className={layoutClass} style={{ zoom: zoomLevel / 100 }}>
+      <div className={layoutClass}>
         <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} zoomLevel={zoomLevel} />
         <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/peserta" element={<UserManagement />} />
-            <Route path="/riwayat" element={<AttendanceHistory />} />
-            <Route path="/magang-sidedi" element={<SidediInternship />} />
-            <Route path="/pengaturan" element={<Settings />} />
-          </Routes>
+          <Suspense fallback={
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
+              Memuat halaman...
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/peserta" element={<UserManagement />} />
+              <Route path="/riwayat" element={<AttendanceHistory />} />
+              <Route path="/magang-sidedi" element={<SidediInternship />} />
+              <Route path="/pengaturan" element={<Settings />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </Router>

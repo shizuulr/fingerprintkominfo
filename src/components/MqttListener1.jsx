@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useRef } from 'react';
 import mqtt from 'mqtt';
 import { collection, addDoc, doc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -123,7 +124,7 @@ async function handleEnrollResult(data) {
 }
 
 function handleDeleteResult(data) {
-    const { fingerprintId, success, error } = data;
+    const { fingerprintId, success } = data;
     console.log(`MQTT: delete_result diterima — ID ${fingerprintId}, sukses: ${success}`);
     if (deleteResultCallback) {
         deleteResultCallback(data);

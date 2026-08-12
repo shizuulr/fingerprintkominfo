@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LuSearch, LuCalendarDays, LuTrash2, LuUser, LuX, LuPrinter } from 'react-icons/lu';
+import { LuSearch, LuCalendarDays, LuTrash2, LuX, LuPrinter } from 'react-icons/lu';
 import { getAttendanceByDate, getAttendanceByDateRange, deleteAttendanceLog, deleteAllAttendanceLogs, getAttendanceStatus } from '../services/attendanceService';
 import { getCompletedInterns, deleteCompletedIntern } from '../services/userService';
 import StatusBadge from '../components/StatusBadge';
