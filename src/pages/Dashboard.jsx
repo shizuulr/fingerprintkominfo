@@ -563,16 +563,22 @@ export default function Dashboard() {
             <table className="table">
               <thead>
                 <tr>
+                  <th style={{ width: '60px' }}>No</th>
                   <th>Nama Peserta</th>
+                  <th>Sekolah</th>
+                  <th>Nomor HP</th>
                   <th>ID Fingerprint</th>
                   <th>Divisi</th>
                   <th>Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {usersWithoutAttendance.map(user => (
+                {usersWithoutAttendance.map((user, index) => (
                   <tr key={user.id}>
+                    <td>{index + 1}</td>
                     <td className="td-name">{user.name}</td>
+                    <td>{user.institution || user.school || '-'}</td>
+                    <td>{user.phone || '-'}</td>
                     <td>
                       <code className="fingerprint-id">{getDisplayId(user.fingerprintId, user.division)}</code>
                     </td>

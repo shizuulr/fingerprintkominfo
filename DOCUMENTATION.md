@@ -709,3 +709,11 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
     - Memberikan warna latar belakang solid/opaque (`#0f172a` pada Dark Theme, `#ffffff` pada Light Theme) serta pembatas garis dan efek *shadow* halus pada kolom Nama, mencegah data di belakangnya tembus pandang atau bercampur saat digeser ke kanan.
     - Memberikan `z-index: 10` tertinggi pada sel perpotongan pojok kiri atas (`th.sticky-col`) agar tetap terkunci secara vertikal maupun horizontal secara bersamaan.
   - **Scroll Containment & Root Cause Isolation (`index.css`)**: Menambahkan `overflow-x: hidden` pada `.main-content` dan `max-width: 100%; overflow-x: auto;` pada `.table-container--sticky` untuk mengisolasi *scroll* horizontal sepenuhnya di dalam kontainer tabel agar tidak meluap ke level tata letak halaman (`body`), menjamin fungsi `position: sticky` bekerja secara stabil di semua peramban (*Chrome, Firefox, Safari, Edge*).
+
+### 20.9. Penyempurnaan Modul Izin dan Unduhan Rekap (14 Agustus 2026)
+- **Latar Belakang**: Operator dashboard membutuhkan kemudahan melihat identitas peserta sebelum memberikan izin, serta kebutuhan mencetak atau mengunduh rekap absensi hasil filter tanggal dengan format formal yang siap digunakan.
+- **Implementasi Utama**:
+  - **`src/pages/Dashboard.jsx`**: Menambahkan kolom **No**, **Sekolah**, dan **Nomor HP** pada tabel **Berikan Izin Peserta**. Informasi ini tampil di sebelah kiri dan mempermudah identifikasi peserta sebelum mengisi izin.
+  - **`src/pages/AttendanceHistory.jsx`**: Menambahkan tombol **Download Rekap** pada hasil pencarian riwayat absensi berdasarkan **Tanggal Tertentu** atau **Rentang Tanggal**. File hasil unduhan berisi data absensi difilter sesuai periode aktif.
+  - **Format Cetak Seragam**: Mengatur layout print/unduhan agar mengikuti format formal modul peserta dan menambahkan slot tanda tangan di bagian bawah dengan format kosong untuk diisi manual, tanpa menampilkan nama pada baris tanda tangan.
+  - **Tujuan**: Mempercepat verifikasi peserta dan menyiapkan laporan absensi yang lebih rapi, formal, dan siap dicetak untuk kebutuhan administrasi.

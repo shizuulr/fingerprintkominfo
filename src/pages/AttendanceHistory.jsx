@@ -93,6 +93,142 @@ export default function AttendanceHistory() {
     }
   };
 
+  const handleDownloadFilteredRecap = () => {
+    if (!attendance.length) {
+      alert('Tidak ada data absensi untuk diunduh.' );
+      return;
+    }
+
+    const periodLabel = filterType === 'single'
+      ? `Tanggal ${selectedDate}`
+      : `Rentang ${startDate} s/d ${endDate}`;
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900');
+    if (!printWindow) {
+      alert('Popup diblokir oleh browser. Izinkan popup untuk mengunduh rekap absensi.');
+      return;
+    }
+
+    const rows = attendance.map((item, index) => {
+      const checkIn = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const checkOut = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+      const status = getAttendanceStatus(item);
+      const location = item.location === 'sidedi' ? 'Desa (SIDEDI)' : item.location === 'izin' ? 'Izin' : 'Kantor (KOMINFO)';
+      const note = item.location === 'izin'
+        ? (item.leaveNote || 'Izin')
+        : item.location === 'sidedi' && item.progress !== undefined && item.progress !== null
+          ? `Progress: ${item.progress}%`
+          : '-';
+
+      return `
+        <tr>
+          <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${index + 1}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${formatDateDisplay(item.date)}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${item.userName || '-'}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${item.institution || '-'}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${item.startDate && item.endDate ? `${item.startDate} s/d ${item.endDate}` : '-'}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${checkIn}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${checkOut}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${location}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${status}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${note}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const today = new Date().toLocaleDateString('id-ID', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Rekap Absensi - ${periodLabel}</title>
+          <style>
+            @page { size: landscape; margin: 15mm; }
+            body { font-family: Arial, sans-serif; color: #111827; margin: 0; padding: 20px; }
+            .kop-surat { display: flex; align-items: center; justify-content: center; margin-bottom: 10px; position: relative; }
+            .kop-logo { width: 70px; height: auto; position: absolute; left: 10px; }
+            .kop-text { text-align: center; width: 100%; }
+            .kop-text h3 { margin: 0; font-size: 15px; font-weight: normal; }
+            .kop-text h2 { margin: 5px 0; font-size: 18px; font-weight: bold; }
+            .kop-text p { margin: 2px 0; font-size: 10px; }
+            .kop-line { border-bottom: 3px solid #000; margin-bottom: 20px; }
+            .report-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 18px; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; text-align: center; }
+            .summary-box { margin-top: 20px; padding: 12px 15px; background: #f8fafc; border: 1px solid #e5e7eb; font-size: 12px; }
+            .summary-box strong { display: block; margin-bottom: 6px; }
+            .footer-section { margin-top: 28px; display: flex; justify-content: flex-end; }
+            .signature-section { width: 250px; text-align: center; font-size: 12px; }
+            .signature-space { height: 75px; }
+          </style>
+        </head>
+        <body>
+          <div class="kop-surat">
+            <img src="${window.location.origin}/logo-temanggung.png" alt="Logo Pemkab Temanggung" class="kop-logo">
+            <div class="kop-text">
+              <h3>PEMERINTAH KABUPATEN TEMANGGUNG</h3>
+              <h2>DINAS KOMUNIKASI DAN INFORMATIKA</h2>
+              <p>Jalan Jenderal Sudirman No. 41-42 Temanggung 56216</p>
+              <p>Telepon (0293) 4961389, Surat Elektronik: kominfo@temanggungkab.go.id</p>
+            </div>
+          </div>
+          <div class="kop-line"></div>
+
+          <div class="report-title">Rekap Absensi</div>
+          <p style="text-align: center; margin: 0 0 18px; font-size: 12px;">Periode: ${periodLabel}</p>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40px;">No</th>
+                <th style="width: 120px;">Tanggal</th>
+                <th>Nama Peserta</th>
+                <th>Instansi/Sekolah</th>
+                <th>Periode Magang</th>
+                <th>Masuk</th>
+                <th>Keluar</th>
+                <th>Lokasi</th>
+                <th>Status</th>
+                <th>Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+
+          <div class="summary-box">
+            <strong>Ringkasan Kehadiran:</strong>
+            Jumlah Data: <strong>${attendance.length} rekaman</strong><br/>
+            Periode: <strong>${periodLabel}</strong>
+          </div>
+
+          <div class="footer-section">
+            <div class="signature-section">
+              <p>Temanggung, ${today}</p>
+              <p>Pembimbing Lapangan,</p>
+              <div class="signature-space"></div>
+              <p style="text-decoration: underline; font-weight: bold;">( ___________________ )</p>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() { window.close(); }
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handlePrintCompletedRecap = (intern) => {
     try {
       const data = intern.rekap_harian || [];
@@ -114,6 +250,17 @@ export default function AttendanceHistory() {
         month: 'long',
         day: 'numeric'
       });
+
+      const signatureBlock = `
+        <div class="signature-container" style="margin-top: 30px; display: flex; justify-content: flex-end;">
+          <div class="signature-box" style="width: 250px; text-align: center;">
+            <p>Temanggung, ${today}</p>
+            <p>Pembimbing Lapangan,</p>
+            <div class="signature-space" style="height: 75px;"></div>
+            <p class="signature-name" style="text-decoration: underline; font-weight: bold;">( ___________________ )</p>
+          </div>
+        </div>
+      `;
 
       const tableRows = data.length === 0 
         ? `<tr><td colspan="6" style="text-align: center; padding: 12px; border: 1px solid #ddd;">Tidak ada data kehadiran</td></tr>`
@@ -357,20 +504,12 @@ export default function AttendanceHistory() {
               Total Hari Efektif Magang: <strong>${data.length} Hari</strong>
             </div>
 
-            <div class="signature-container" style="margin-top: 30px;">
-              <div class="signature-box">
-                <p>Mengetahui,</p>
-                <p>Pembimbing Lapangan</p>
-                <div class="signature-space"></div>
-                <p class="signature-name">${intern.advisor || '...........................................'}</p>
-                <p>NIP. ...........................................</p>
-              </div>
-              <div class="signature-box right">
+            <div class="signature-container" style="margin-top: 30px; display: flex; justify-content: flex-end;">
+              <div class="signature-box" style="width: 250px; text-align: center;">
                 <p>Temanggung, ${today}</p>
-                <p>Peserta Magang,</p>
-                <div class="signature-space"></div>
-                <p class="signature-name">${intern.name}</p>
-                <p>NIM/NISN. -</p>
+                <p>Pembimbing Lapangan,</p>
+                <div class="signature-space" style="height: 75px;"></div>
+                <p class="signature-name" style="text-decoration: underline; font-weight: bold;">( ___________________ )</p>
               </div>
             </div>
 
@@ -517,8 +656,13 @@ export default function AttendanceHistory() {
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2>Hasil Pencarian</h2>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="badge badge--info">{attendance.length} data</span>
+              {attendance.length > 0 && (
+                <button className="btn" onClick={handleDownloadFilteredRecap} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: 'var(--color-success)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <LuPrinter size={12} /> Download Rekap
+                </button>
+              )}
               {attendance.length > 0 && (
                 <button className="btn btn--danger" onClick={handleDeleteAll} style={{ padding: '6px 12px', fontSize: '12px' }}>
                   <LuTrash2 /> Hapus Semua

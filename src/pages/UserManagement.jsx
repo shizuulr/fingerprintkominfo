@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { LuPlus, LuPencil, LuTrash2, LuSearch, LuFingerprint, LuPrinter, LuSettings, LuCheck, LuRefreshCw } from 'react-icons/lu';
 import { addUserOnly, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor, completeInternship } from '../services/userService';
 import { getAttendanceByFingerprintId } from '../services/attendanceService';
@@ -38,6 +38,9 @@ export default function UserManagement() {
   const [isResetAllModalOpen, setIsResetAllModalOpen] = useState(false);
   const [resetAllLoading, setResetAllLoading] = useState(false);
 
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [divisionFilter, setDivisionFilter] = useState('');
+  const [institutionFilter, setInstitutionFilter] = useState('');
   const [majors, setMajors] = useState([]);
   const [advisors, setAdvisors] = useState([]);
   const [sidediLocations, setSidediLocations] = useState([]);
@@ -87,6 +90,16 @@ export default function UserManagement() {
     } catch (err) {
       console.error('Error fetching users:', err);
     }
+  };
+
+  const handleSort = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        const newDir = prev.direction === 'asc' ? 'desc' : prev.direction === 'desc' ? null : 'asc';
+        return { key: newDir ? key : null, direction: newDir };
+      }
+      return { key, direction: 'asc' };
+    });
   };
 
   const handleInputChange = (e) => {
@@ -448,57 +461,57 @@ export default function UserManagement() {
     if (!user.fingerprintId) return;
     try {
       const data = await getAttendanceByFingerprintId(user.fingerprintId);
-      
+
       let totalSidedi = 0;
       let totalKominfo = 0;
       let totalSidediWithProgress = 0;
       let sumSidediProgress = 0;
-      
+
       data.forEach(item => {
-         if (item.location === 'sidedi') {
-            totalSidedi++;
-            if (item.progress !== undefined && item.progress !== null) {
-              totalSidediWithProgress++;
-              sumSidediProgress += Number(item.progress);
-            }
-         }
-         else if (item.status && item.status.includes('Hadir')) totalKominfo++;
+        if (item.location === 'sidedi') {
+          totalSidedi++;
+          if (item.progress !== undefined && item.progress !== null) {
+            totalSidediWithProgress++;
+            sumSidediProgress += Number(item.progress);
+          }
+        }
+        else if (item.status && item.status.includes('Hadir')) totalKominfo++;
       });
-      
-      const avgSidediProgress = totalSidediWithProgress > 0 
-        ? Math.round(sumSidediProgress / totalSidediWithProgress) 
+
+      const avgSidediProgress = totalSidediWithProgress > 0
+        ? Math.round(sumSidediProgress / totalSidediWithProgress)
         : 0;
-      
+
       let desaPlacement = '-';
       const userLocations = sidediLocations.filter(loc => loc.participantIds?.includes(user.id));
       if (userLocations.length > 0) {
-         desaPlacement = userLocations.map(l => l.name).join(', ');
+        desaPlacement = userLocations.map(l => l.name).join(', ');
       }
 
       const printWindow = window.open('', '_blank');
-      
+
       const today = new Date().toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
 
-      const tableRows = data.length === 0 
+      const tableRows = data.length === 0
         ? `<tr><td colspan="6" style="text-align: center; padding: 12px; border: 1px solid #ddd;">Tidak ada data kehadiran</td></tr>`
         : data.map((item, index) => {
-            const dateObj = new Date(item.date + 'T00:00:00');
-            const formattedDate = dateObj.toLocaleDateString('id-ID', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            });
-            const checkInStr = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-            const checkOutStr = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-            const locationStr = item.location === 'sidedi' ? 'SIDEDI' : 'KOMINFO';
-            const isSidedi = item.location === 'sidedi';
-            const progressInfo = isSidedi && item.progress !== undefined && item.progress !== null ? ` [Prog: ${item.progress}%]` : '';
-            return `
+          const dateObj = new Date(item.date + 'T00:00:00');
+          const formattedDate = dateObj.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          const checkInStr = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+          const checkOutStr = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+          const locationStr = item.location === 'sidedi' ? 'SIDEDI' : 'KOMINFO';
+          const isSidedi = item.location === 'sidedi';
+          const progressInfo = isSidedi && item.progress !== undefined && item.progress !== null ? ` [Prog: ${item.progress}%]` : '';
+          return `
               <tr>
                 <td style="text-align: center; padding: 8px; border: 1px solid #ddd;">${index + 1}</td>
                 <td style="padding: 8px; border: 1px solid #ddd;">${formattedDate}</td>
@@ -508,7 +521,7 @@ export default function UserManagement() {
                 <td style="text-align: center; padding: 8px; border: 1px solid #ddd; font-weight: bold; color: ${item.status && item.status.includes('Hadir') ? 'green' : 'red'};">${item.status}${progressInfo}</td>
               </tr>
             `;
-          }).join('');
+        }).join('');
 
       printWindow.document.write(`
         <html>
@@ -760,13 +773,41 @@ export default function UserManagement() {
     }
   };
 
-  const filteredUsers = users.filter((user) =>
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.institution?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.major?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.division?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    String(user.fingerprintId).includes(searchTerm)
-  );
+  const filteredUsers = useMemo(() => {
+    let data = users.filter((user) => {
+      const matchesSearch =
+        user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.institution?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.major?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.division?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(user.fingerprintId).includes(searchTerm);
+      const matchesDivision = divisionFilter ? user.division === divisionFilter : true;
+      const matchesInstitution = institutionFilter ? user.institution === institutionFilter : true;
+      return matchesSearch && matchesDivision && matchesInstitution;
+    });
+    if (sortConfig.key) {
+      data = [...data].sort((a, b) => {
+        const aVal = a[sortConfig.key] ?? '';
+        const bVal = b[sortConfig.key] ?? '';
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return data;
+  }, [users, searchTerm, divisionFilter, institutionFilter, sortConfig]);
+
+  const renderSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return <span style={{ opacity: 0.35, marginLeft: '4px', fontSize: '11px' }}>⇅</span>;
+    }
+    return (
+      <span style={{ color: '#3b82f6', marginLeft: '4px', fontSize: '11px', fontWeight: 'bold' }}>
+        {sortConfig.direction === 'asc' ? '▲' : '▼'}
+      </span>
+    );
+  };
+
 
   const getDisplayId = (fingerprintId, division) => {
     if (!fingerprintId) return 'Belum Enroll';
@@ -854,6 +895,64 @@ export default function UserManagement() {
             className="search-input"
           />
         </div>
+        {/* Filters */}
+        <div className="filters" style={{ marginTop: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '500', whiteSpace: 'nowrap' }}>
+              Filter:
+            </span>
+          </div>
+          <select value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)} className="filter-select">
+            <option value="">Semua Divisi</option>
+            <option value="TIK">TIK</option>
+            <option value="STATISTIK">STATISTIK</option>
+            <option value="IKP">IKP</option>
+            <option value="SEKRETARIAT">SEKRETARIAT</option>
+          </select>
+          <select value={institutionFilter} onChange={(e) => setInstitutionFilter(e.target.value)} className="filter-select">
+            <option value="">Semua Instansi</option>
+            {Array.from(new Set(users.map(u => u.institution).filter(Boolean))).map((inst) => (
+              <option key={inst} value={inst}>{inst}</option>
+            ))}
+          </select>
+          {(divisionFilter || institutionFilter) && (
+            <button
+              onClick={() => { setDivisionFilter(''); setInstitutionFilter(''); }}
+              style={{
+                padding: '6px 12px',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-danger-light)',
+                fontSize: '12px',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-family)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'all var(--transition-base)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+            >
+              ✕ Reset Filter
+            </button>
+          )}
+          {(divisionFilter || institutionFilter || searchTerm) && (
+            <span style={{
+              marginLeft: 'auto',
+              fontSize: '12px',
+              color: 'var(--color-primary-light)',
+              background: 'rgba(139, 92, 246, 0.12)',
+              border: '1px solid rgba(139, 92, 246, 0.25)',
+              borderRadius: 'var(--radius-full)',
+              padding: '4px 10px',
+              fontWeight: '500',
+            }}>
+              {filteredUsers.length} dari {users.length} peserta
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Users Table */}
@@ -866,22 +965,38 @@ export default function UserManagement() {
           <table className="table" style={{ minWidth: '1500px' }}>
             <thead>
               <tr>
-                <th className="sticky-col sticky-col--0">
+                <th className="sticky-col sticky-col--0" style={{ width: '40px' }}>
                   <input
                     type="checkbox"
                     checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
                     onChange={handleSelectAll}
                   />
                 </th>
-                <th className="sticky-col sticky-col--1">No</th>
-                <th className="sticky-col sticky-col--2">Nama Peserta</th>
-                <th>Instansi Asal</th>
-                <th>Jurusan</th>
-                <th>No. HP Peserta</th>
-                <th>Pembimbing</th>
-                <th>No. HP Pembimbing</th>
-                <th>Divisi/Bagian</th>
-                <th>Periode PKL</th>
+                <th className="sticky-col sticky-col--1" style={{ width: '50px' }}>No</th>
+                <th className="sticky-col sticky-col--2" onClick={() => handleSort('name')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Nama Peserta {renderSortIcon('name')}
+                </th>
+                <th onClick={() => handleSort('institution')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Instansi Asal {renderSortIcon('institution')}
+                </th>
+                <th onClick={() => handleSort('major')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Jurusan {renderSortIcon('major')}
+                </th>
+                <th onClick={() => handleSort('phone')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  No. HP Peserta {renderSortIcon('phone')}
+                </th>
+                <th onClick={() => handleSort('advisor')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Pembimbing {renderSortIcon('advisor')}
+                </th>
+                <th onClick={() => handleSort('no_hp_pembimbing')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  No. HP Pembimbing {renderSortIcon('no_hp_pembimbing')}
+                </th>
+                <th onClick={() => handleSort('division')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Divisi/Bagian {renderSortIcon('division')}
+                </th>
+                <th onClick={() => handleSort('startDate')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                  Periode PKL {renderSortIcon('startDate')}
+                </th>
                 <th>Media Sosial</th>
                 <th>Status Fingerprint</th>
                 <th>Aksi</th>
