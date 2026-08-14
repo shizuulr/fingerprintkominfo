@@ -578,6 +578,7 @@ body::before {
   min-height: 100vh;
   animation: fadeIn 0.5s ease;
   transition: margin-left var(--transition-base);
+  overflow-x: hidden;
 }
 
 /* ── Sidebar ── */
@@ -960,15 +961,17 @@ body::before {
   border-radius: var(--radius-md);
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-sm);
+.table-container--sticky {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
 }
 
-.table thead {
-  position: sticky;
-  top: 0;
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--font-size-sm);
 }
 
 .table th {
@@ -987,6 +990,105 @@ body::before {
   padding: var(--space-md) var(--space-lg);
   border-bottom: 1px solid var(--border-color);
   white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════
+   STICKY TABLE — Only inside .table-container--sticky
+   ══════════════════════════════════════════════ */
+
+/* All th in sticky container: stick to top on vertical scroll */
+.table-container--sticky .table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1e293b;
+  border-bottom: 2px solid var(--border-color);
+}
+
+/* ── Sticky Columns (freeze Checkbox, No, Nama on horizontal scroll) ── */
+
+/* Column 0: Checkbox */
+.table-container--sticky .table th.sticky-col--0,
+.table-container--sticky .table td.sticky-col--0 {
+  position: sticky;
+  left: 0;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* Column 1: No */
+.table-container--sticky .table th.sticky-col--1,
+.table-container--sticky .table td.sticky-col--1 {
+  position: sticky;
+  left: 48px;
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* Column 2: Nama Peserta */
+.table-container--sticky .table th.sticky-col--2,
+.table-container--sticky .table td.sticky-col--2 {
+  position: sticky;
+  left: 100px;
+  min-width: 200px;
+  border-right: 2px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 4px 0 6px -2px rgba(0, 0, 0, 0.25);
+}
+
+/* Sticky tbody td: solid background so scrolled content hides behind */
+.table-container--sticky .table td.sticky-col--0,
+.table-container--sticky .table td.sticky-col--1,
+.table-container--sticky .table td.sticky-col--2 {
+  z-index: 1;
+  background-color: #0f172a;
+}
+
+/* Hover state for sticky td */
+.table-container--sticky .table tbody tr:hover td.sticky-col--0,
+.table-container--sticky .table tbody tr:hover td.sticky-col--1,
+.table-container--sticky .table tbody tr:hover td.sticky-col--2 {
+  background-color: #1a1540;
+}
+
+/* Intersection: sticky header + sticky column (corner cells) — highest z */
+.table-container--sticky .table th.sticky-col--0,
+.table-container--sticky .table th.sticky-col--1,
+.table-container--sticky .table th.sticky-col--2 {
+  z-index: 10;
+  background-color: #1e293b;
+}
+
+/* ── Light theme overrides for sticky table ── */
+[data-theme="light"] .table-container--sticky .table th {
+  background-color: #ffffff;
+  color: #6b7280;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+[data-theme="light"] .table-container--sticky .table td.sticky-col--0,
+[data-theme="light"] .table-container--sticky .table td.sticky-col--1,
+[data-theme="light"] .table-container--sticky .table td.sticky-col--2 {
+  background-color: #ffffff;
+}
+
+[data-theme="light"] .table-container--sticky .table tbody tr:hover td.sticky-col--0,
+[data-theme="light"] .table-container--sticky .table tbody tr:hover td.sticky-col--1,
+[data-theme="light"] .table-container--sticky .table tbody tr:hover td.sticky-col--2 {
+  background-color: #f5f3ff;
+}
+
+[data-theme="light"] .table-container--sticky .table th.sticky-col--0,
+[data-theme="light"] .table-container--sticky .table th.sticky-col--1,
+[data-theme="light"] .table-container--sticky .table th.sticky-col--2 {
+  background-color: #ffffff;
 }
 
 .table tbody tr {

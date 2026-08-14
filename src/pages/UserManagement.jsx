@@ -862,24 +862,24 @@ export default function UserManagement() {
           <h2>Daftar Peserta Terdaftar</h2>
           <span className="badge badge--info">{filteredUsers.length} peserta</span>
         </div>
-        <div className="table-container" style={{ overflowX: 'auto' }}>
+        <div className="table-container table-container--sticky" style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '75vh' }}>
           <table className="table" style={{ minWidth: '1500px' }}>
             <thead>
               <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>
+                <th className="sticky-col sticky-col--0">
                   <input
                     type="checkbox"
                     checked={filteredUsers.length > 0 && selectedUserIds.length === filteredUsers.length}
                     onChange={handleSelectAll}
                   />
                 </th>
-                <th>No</th>
-                <th>Nama Peserta</th>
+                <th className="sticky-col sticky-col--1">No</th>
+                <th className="sticky-col sticky-col--2">Nama Peserta</th>
                 <th>Instansi Asal</th>
                 <th>Jurusan</th>
+                <th>No. HP Peserta</th>
                 <th>Pembimbing</th>
                 <th>No. HP Pembimbing</th>
-                <th>No. HP Peserta</th>
                 <th>Divisi/Bagian</th>
                 <th>Periode PKL</th>
                 <th>Media Sosial</th>
@@ -890,27 +890,27 @@ export default function UserManagement() {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="table-empty">
+                  <td colSpan="13" className="table-empty" style={{ position: 'static' }}>
                     {searchTerm ? 'Tidak ada peserta yang sesuai pencarian' : 'Belum ada peserta terdaftar'}
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user, index) => (
                   <tr key={user.id} className="table-row-animate">
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="sticky-col sticky-col--0">
                       <input
                         type="checkbox"
                         checked={selectedUserIds.includes(user.id)}
                         onChange={() => handleSelectUser(user.id)}
                       />
                     </td>
-                    <td>{index + 1}</td>
-                    <td className="td-name">{user.name}</td>
+                    <td className="sticky-col sticky-col--1">{index + 1}</td>
+                    <td className="td-name sticky-col sticky-col--2">{user.name}</td>
                     <td>{user.institution ? user.institution : <span className="badge badge--danger">-</span>}</td>
                     <td>{user.major ? user.major : <span className="badge badge--danger">-</span>}</td>
+                    <td>{user.phone ? user.phone : <span className="badge badge--danger">-</span>}</td>
                     <td>{user.advisor ? user.advisor : <span className="badge badge--danger">Belum Diisi</span>}</td>
                     <td>{user.no_hp_pembimbing ? user.no_hp_pembimbing : <span className="badge badge--danger">Belum Diisi</span>}</td>
-                    <td>{user.phone ? user.phone : <span className="badge badge--danger">-</span>}</td>
                     <td>{user.division ? user.division : <span className="badge badge--danger">-</span>}</td>
                     <td>
                       {user.startDate && user.endDate

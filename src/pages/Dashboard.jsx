@@ -78,7 +78,6 @@ export default function Dashboard() {
       try {
         const users = await getActiveUsers();
         setActiveUsers(users);
-        setTotalUsers(users.length);
 
         const today = getTodayDate();
         const schedules = await getTodaySchedules(today);

@@ -375,6 +375,8 @@ Menyimpan snapshot log dari perangkat saat admin/pengembang mendeteksi masalah a
 
 ### 9.2. Manajemen Peserta (`/peserta`)
 - **CRUD Peserta**: Pendaftaran peserta PKL baru yang otomatis memicu proses enroll ke alat ESP32.
+- **Tabel Interaktif dengan Sticky Header & Frozen Columns**: Tabel daftar peserta dilengkapi fitur *sticky header* (header tabel tetap menempel di atas saat scroll ke bawah) dan *frozen columns* (kolom Checkbox, No, dan Nama Peserta tetap terkunci di sisi kiri saat scroll ke kanan), memudahkan peninjauan data tabel yang memiliki banyak kolom dan baris.
+- **Tata Letak Kolom Kontak Intuitif**: Kolom No. HP Peserta diposisikan langsung berdampingan setelah kolom Jurusan untuk efisiensi verifikasi data profil peserta.
 - **Manajemen Jurusan & Pembimbing**: Modal kelola master data jurusan dan pembimbing lapangan.
 - **Filter & Multi-Select Bulk Delete**: Fitur seleksi massal untuk menghapus data peserta dan sidik jari terdaftar.
 - **Reset Total Sidik Jari**: Opsi untuk mengosongkan seluruh memori sidik jari di perangkat hardware.
@@ -693,3 +695,17 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
   - **Dynamic Routing (React.lazy & Suspense)**: Mengubah sistem muat halaman pada `App.jsx`. Halaman seperti *UserManagement*, *Settings*, dan *SidediInternship* kini hanya akan diunduh oleh browser ketika pengguna mengunjungi rute tersebut.
   - **Manual Chunks (Vite / Rolldown)**: Mengonfigurasi `build.rollupOptions.output.manualChunks` pada `vite.config.js` untuk memecah pustaka-pustaka pihak ketiga berukuran besar (Firebase SDK, MQTT.js, React-Icons) menjadi file `.js` terpisah (misal: `vendor-firebase.js`).
   - **Hasil**: Berhasil menurunkan ukuran file bundel utama dari **1.269 kB** menjadi rata-rata **20-50 kB** per halaman, dan meloloskan aplikasi dari semua peringatan performa kompilasi.
+
+### 20.8. Optimalisasi UX Tabel Manajemen Peserta & Perbaikan Bug Dashboard (14 Agustus 2026)
+- **Latar Belakang**: 
+  1. Pada halaman Dashboard, pemuatan jadwal Magang Desa (SIDEDI) dan kartu "Konfirmasi Kehadiran Magang Desa" mengalami error (*crash*) akibat pemanggilan fungsi yang belum terdefinisi (`setTotalUsers`).
+  2. Pada halaman Manajemen Peserta (`/peserta`), daftar peserta memiliki banyak kolom data (13 kolom) dan baris yang panjang, menyebabkan pengguna kesulitan melacak identitas peserta saat melakukan *scroll* horizontal ke kanan atau memverifikasi label kolom saat *scroll* vertikal ke bawah.
+- **Implementasi Utama**:
+  - **Perbaikan Bug ReferenceError Dashboard (`Dashboard.jsx`)**: Menghapus pemanggilan `setTotalUsers` yang tidak dideklarasikan pada `useEffect` sinkronisasi jadwal harian, memulihkan proses pemuatan data peserta SIDEDI dan rendering kartu konfirmasi kehadiran magang desa.
+  - **Penyusunan Ulang Kolom Kontak Peserta (`UserManagement.jsx`)**: Memindahkan urutan kolom **No. HP Peserta** agar berada persis di sebelah kolom **Jurusan** (sebelumnya berada setelah No. HP Pembimbing), memudahkan verifikasi kontak langsung dari profil peserta.
+  - **Implementasi Sticky Table Header (Scroll Vertikal)**: Menetapkan `position: sticky; top: 0; z-index: 2` pada elemen `<th>` tabel di dalam `.table-container--sticky` dengan pembatasan tinggi `max-height: 75vh; overflow-y: auto`, sehingga header kolom tetap terkunci di bagian atas saat tabel digulir ke bawah.
+  - **Implementasi Frozen Columns (Scroll Horizontal)**: 
+    - Mengunci 3 kolom pertama: **Checkbox** (`left: 0`, lebar `48px`), **No** (`left: 48px`, lebar `52px`), dan **Nama Peserta** (`left: 100px`, lebar `220px`) menggunakan `position: sticky`.
+    - Memberikan warna latar belakang solid/opaque (`#0f172a` pada Dark Theme, `#ffffff` pada Light Theme) serta pembatas garis dan efek *shadow* halus pada kolom Nama, mencegah data di belakangnya tembus pandang atau bercampur saat digeser ke kanan.
+    - Memberikan `z-index: 10` tertinggi pada sel perpotongan pojok kiri atas (`th.sticky-col`) agar tetap terkunci secara vertikal maupun horizontal secara bersamaan.
+  - **Scroll Containment & Root Cause Isolation (`index.css`)**: Menambahkan `overflow-x: hidden` pada `.main-content` dan `max-width: 100%; overflow-x: auto;` pada `.table-container--sticky` untuk mengisolasi *scroll* horizontal sepenuhnya di dalam kontainer tabel agar tidak meluap ke level tata letak halaman (`body`), menjamin fungsi `position: sticky` bekerja secara stabil di semua peramban (*Chrome, Firefox, Safari, Edge*).

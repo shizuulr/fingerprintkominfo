@@ -12,7 +12,7 @@ SIAP (*Sistem Informasi Absensi PKL*) adalah aplikasi web manajemen absensi real
 - **Dual Placement Mode**:
   - **KOMINFO**: Kehadiran fisik di kantor Diskominfo via pemindai sidik jari.
   - **SIDEDI (Sistem Desa Digital)**: Penempatan magang di desa-desa dengan konfirmasi kehadiran manual & progres pekerjaan.
-- **Manajemen Peserta & Pendaftaran Fingerprint**: Input data peserta dan proses registrasi sidik jari ke ESP32 secara nirkabel.
+- **Manajemen Peserta & Pendaftaran Fingerprint**: Input data peserta, proses registrasi sidik jari ke ESP32 secara nirkabel, serta antarmuka tabel interaktif dengan fitur *sticky header* dan *frozen columns* (kolom Checkbox, Nomor, dan Nama Peserta tetap terkunci saat scroll horizontal).
 - **Cetak Laporan & Kop Surat Resmi**: Fitur ekspor laporan absensi (global dan individual) lengkap dengan Kop Surat resmi Dinas Kominfo Kabupaten Temanggung.
 - **Pengaturan & Tampilan**: Modul pengaturan yang mencakup opsi Mode Gelap (Dark Mode), penyesuaian ukuran font dinamis, kendali *Remote Reset* untuk perangkat ESP32 via MQTT, **Konfigurasi Jaringan WiFi ESP32** secara dinamis (Mode Jaringan HTTP & Mode Kabel WebSerial API), serta **Mode Pengembang & Log Viewer System** (dengan Eruda console dan pemantauan error otomatis).
 - **Navigasi & Zoom Interaktif**: Sidebar navigasi dapat diperkecil (minimize/collapse) secara fleksibel untuk memperluas area kerja, serta dukungan fitur **Global Zoom In/Out** via pintasan mouse (Ctrl + Scroll / Trackpad Pinch) dan keyboard (Ctrl + / - / 0) dengan penyimpanan preferensi otomatis.
