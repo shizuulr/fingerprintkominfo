@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { LuPlus, LuPencil, LuTrash2, LuSearch, LuFingerprint, LuPrinter, LuSettings, LuCheck, LuRefreshCw } from 'react-icons/lu';
 import { addUserOnly, getAllUsers, updateUser, deleteUser, deleteAllUsers, getAllMajors, addMajor, deleteMajor, getAllAdvisors, addAdvisor, deleteAdvisor, completeInternship } from '../services/userService';
-import { getAttendanceByFingerprintId } from '../services/attendanceService';
+import { getAttendanceByFingerprintId, deleteAttendanceByFingerprintId } from '../services/attendanceService';
 import { getAllSidediLocations } from '../services/sidediService';
 import { publishEnrollRequest, publishDeleteRequest, publishClearAllRequest, registerDeleteResultCallback, unregisterDeleteResultCallback } from '../components/MqttListener';
 import Modal from '../components/Modal';
@@ -37,6 +37,7 @@ export default function UserManagement() {
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   const [isResetAllModalOpen, setIsResetAllModalOpen] = useState(false);
   const [resetAllLoading, setResetAllLoading] = useState(false);
+  const [reEnrollLoadingId, setReEnrollLoadingId] = useState(null);
 
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [divisionFilter, setDivisionFilter] = useState('');
@@ -281,6 +282,92 @@ export default function UserManagement() {
     }
   };
 
+  // Melakukan enroll ulang untuk peserta yang sudah terdaftar.
+  // Menghapus sidik jari lama di alat (ESP32) terlebih dahulu,
+  // setelah berhasil, status direset ke 'menunggu_enroll' dan fingerprintId dikosongkan
+  // lalu mengirimkan permintaan enroll baru ke ESP32.
+  const handleReEnroll = async (user) => {
+    if (!user.fingerprintId) return;
+    if (!window.confirm(`Apakah Anda yakin ingin melakukan Enroll Ulang untuk "${user.name}"?\n\nSidik jari lama akan dihapus permanen dari sensor alat (ESP32) dan sistem, kemudian sistem akan memulai pendaftaran jari baru.`)) return;
+
+    setReEnrollLoadingId(user.id);
+    setError('');
+    setSuccessMsg('');
+    setInfoMsg('Menghubungi alat untuk menghapus sidik jari lama...');
+
+    const terkirim = publishDeleteRequest(user.fingerprintId);
+    if (!terkirim) {
+      // Sensor tidak terhubung - tawarkan untuk memaksa re-enroll lokal
+      if (window.confirm(`Alat fingerprint tidak terhubung.\n\nApakah Anda ingin tetap memaksakan re-enroll di sistem? (Sidik jari lama di sensor mungkin tidak terhapus dan harus dibersihkan manual nanti)`)) {
+        try {
+          await updateUser(user.id, { status: 'menunggu_enroll', fingerprintId: null });
+          setSuccessMsg(`Status ${user.name} berhasil direset ke Menunggu Enroll.`);
+          setInfoMsg(`Silakan sambungkan alat, lalu klik "Daftarkan Fingerprint" atau "Enroll Ulang" pada kolom aksi.`);
+          fetchUsers();
+        } catch (err) {
+          setError('Gagal memaksa re-enroll: ' + err.message);
+        }
+      } else {
+        setInfoMsg('');
+      }
+      setReEnrollLoadingId(null);
+      return;
+    }
+
+    // Tunggu delete_result dari sensor, dengan timeout 10 detik
+    const timeoutRef = { id: null, resolved: false };
+
+    registerDeleteResultCallback(async (result) => {
+      if (Number(result.fingerprintId) !== Number(user.fingerprintId)) return;
+      if (timeoutRef.resolved) return;
+      timeoutRef.resolved = true;
+
+      clearTimeout(timeoutRef.id);
+      unregisterDeleteResultCallback();
+
+      if (result.success) {
+        try {
+          await updateUser(user.id, { status: 'menunggu_enroll', fingerprintId: null });
+          const enrollTerkirim = publishEnrollRequest(user.id, user.name);
+          if (enrollTerkirim) {
+            setSuccessMsg(`Sidik jari lama "${user.name}" berhasil dihapus dari alat. Permintaan enroll baru terkirim!`);
+            setInfoMsg(`Silakan minta ${user.name} menempelkan jari baru pada alat sekarang.`);
+          } else {
+            setSuccessMsg(`Sidik jari lama "${user.name}" terhapus. Status diset ke "Menunggu Enroll".`);
+            setInfoMsg('Alat tidak terhubung saat mencoba enroll baru. Pastikan koneksi alat stabil.');
+          }
+          fetchUsers();
+        } catch (err) {
+          setError('Gagal memperbarui data peserta: ' + err.message);
+        }
+      } else {
+        setError(`Gagal menghapus sidik jari lama dari sensor: ${result.error || 'Error tidak diketahui'}. Proses enroll ulang dibatalkan.`);
+      }
+      setReEnrollLoadingId(null);
+    });
+
+    timeoutRef.id = setTimeout(async () => {
+      if (timeoutRef.resolved) return;
+      timeoutRef.resolved = true;
+
+      unregisterDeleteResultCallback();
+
+      if (window.confirm(`Alat fingerprint tidak merespons perintah hapus dalam 10 detik.\n\nApakah Anda tetap ingin melanjutkan proses enroll ulang di sistem?`)) {
+        try {
+          await updateUser(user.id, { status: 'menunggu_enroll', fingerprintId: null });
+          setSuccessMsg(`Status ${user.name} didegradasi ke "Menunggu Enroll".`);
+          setInfoMsg(`Silakan lakukan proses enroll ulang secara mandiri.`);
+          fetchUsers();
+        } catch (err) {
+          setError('Gagal memaksa re-enroll: ' + err.message);
+        }
+      } else {
+        setInfoMsg('');
+      }
+      setReEnrollLoadingId(null);
+    }, 10000);
+  };
+
   const handleEdit = (user) => {
     setFormData({
       name: user.name || '',
@@ -358,8 +445,12 @@ export default function UserManagement() {
 
       if (result.success) {
         try {
+          // Cascade delete: hapus semua log absensi peserta ini
+          if (deletingUser.fingerprintId) {
+            await deleteAttendanceByFingerprintId(deletingUser.fingerprintId);
+          }
           await deleteUser(deletingUser.id);
-          setSuccessMsg(`Peserta ${deletingUser.name} berhasil dihapus dari sistem dan sensor.`);
+          setSuccessMsg(`Peserta ${deletingUser.name} berhasil dihapus dari sistem, sensor, dan riwayat absensi.`);
           setIsDeleteModalOpen(false);
           setDeletingUser(null);
           fetchUsers();
@@ -378,10 +469,13 @@ export default function UserManagement() {
 
       unregisterDeleteResultCallback();
 
-      // Timeout — tetap hapus Firestore, tampilkan peringatan
+      // Timeout — tetap hapus Firestore + log, tampilkan peringatan
       try {
+        if (deletingUser.fingerprintId) {
+          await deleteAttendanceByFingerprintId(deletingUser.fingerprintId);
+        }
         await deleteUser(deletingUser.id);
-        setSuccessMsg(`Peserta ${deletingUser.name} berhasil dihapus dari sistem.`);
+        setSuccessMsg(`Peserta ${deletingUser.name} berhasil dihapus dari sistem dan riwayat absensi.`);
         setError('Peringatan: sensor tidak merespons dalam 10 detik. Template sidik jari di sensor mungkin belum terhapus dan perlu dihapus manual.');
         setIsDeleteModalOpen(false);
         setDeletingUser(null);
@@ -425,10 +519,11 @@ export default function UserManagement() {
     for (const user of usersToDelete) {
       try {
         if (user.fingerprintId) {
-          // Kirim perintah delete ke alat
           publishDeleteRequest(user.fingerprintId);
           // Beri jeda kecil agar broker/alat tidak kepenuhan pesan MQTT
           await new Promise((resolve) => setTimeout(resolve, 300));
+          // Cascade delete log absensi
+          await deleteAttendanceByFingerprintId(user.fingerprintId);
         }
         await deleteUser(user.id);
         successCount++;
@@ -1068,14 +1163,25 @@ export default function UserManagement() {
                           </button>
                         )}
                         {user.fingerprintId && (
-                          <button
-                            className="btn btn--icon"
-                            onClick={() => handlePrintRecap(user)}
-                            title="Cetak Rekap Absen"
-                            style={{ backgroundColor: '#10b981', color: 'white' }}
-                          >
-                            <LuPrinter />
-                          </button>
+                          <>
+                            <button
+                              className="btn btn--icon"
+                              onClick={() => handlePrintRecap(user)}
+                              title="Cetak Rekap Absen"
+                              style={{ backgroundColor: '#10b981', color: 'white' }}
+                            >
+                              <LuPrinter />
+                            </button>
+                            <button
+                              className="btn btn--icon"
+                              onClick={() => handleReEnroll(user)}
+                              title="Re-enroll (Daftar Ulang Sidik Jari)"
+                              style={{ backgroundColor: '#ec4899', color: 'white' }}
+                              disabled={reEnrollLoadingId === user.id}
+                            >
+                              <LuRefreshCw />
+                            </button>
+                          </>
                         )}
                         <button
                           className="btn btn--icon btn--edit"

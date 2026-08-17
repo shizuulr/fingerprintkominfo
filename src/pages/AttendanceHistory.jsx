@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LuSearch, LuCalendarDays, LuTrash2, LuX, LuPrinter } from 'react-icons/lu';
-import { getAttendanceByDate, getAttendanceByDateRange, deleteAttendanceLog, deleteAllAttendanceLogs, getAttendanceStatus } from '../services/attendanceService';
+import { getAttendanceByDate, getAttendanceByDateRange, deleteAttendanceLog, deleteAllAttendanceLogs, getAttendanceStatus, deleteOrphanAttendanceLogs } from '../services/attendanceService';
 import { getCompletedInterns, deleteCompletedIntern } from '../services/userService';
 import StatusBadge from '../components/StatusBadge';
 
@@ -12,6 +12,8 @@ export default function AttendanceHistory() {
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupMsg, setCleanupMsg] = useState(null);
 
   // Completed Interns states
   const [completedInterns, setCompletedInterns] = useState([]);
@@ -79,6 +81,28 @@ export default function AttendanceHistory() {
       } catch (err) {
         alert('Gagal mereset data absensi: ' + err.message);
       }
+    }
+  };
+
+  const handleCleanupOrphans = async () => {
+    if (!window.confirm(
+      'Bersihkan semua log absensi dari peserta yang sudah dihapus?\n\nLog peserta aktif tidak akan terpengaruh.'
+    )) return;
+    setCleanupLoading(true);
+    setCleanupMsg(null);
+    try {
+      const result = await deleteOrphanAttendanceLogs();
+      if (result.deletedCount > 0) {
+        setCleanupMsg(`✓ ${result.deletedCount} log lama berhasil dihapus.`);
+        // Refresh hasil pencarian setelah cleanup
+        await handleSearch();
+      } else {
+        setCleanupMsg('✓ Tidak ada log lama ditemukan. Data sudah bersih.');
+      }
+    } catch (err) {
+      setCleanupMsg('✗ Gagal: ' + err.message);
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -654,10 +678,24 @@ export default function AttendanceHistory() {
       {/* Results for Dates */}
       {filterType !== 'completed' && searched && (
         <div className="card">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
             <h2>Hasil Pencarian</h2>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
               <span className="badge badge--info">{attendance.length} data</span>
+
+              {/* Tombol Bersihkan Log Lama */}
+              <button
+                className="btn btn--warning"
+                id="cleanup-orphan-btn"
+                onClick={handleCleanupOrphans}
+                disabled={cleanupLoading}
+                title="Hapus log absensi dari peserta yang sudah tidak terdaftar"
+                style={{ padding: '6px 12px', fontSize: '12px', background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', color: '#0f172a', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+              >
+                <LuTrash2 size={12} />
+                {cleanupLoading ? 'Membersihkan...' : 'Bersihkan Log Lama'}
+              </button>
+
               {attendance.length > 0 && (
                 <button className="btn" onClick={handleDownloadFilteredRecap} style={{ padding: '6px 12px', fontSize: '12px', backgroundColor: 'var(--color-success)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   <LuPrinter size={12} /> Download Rekap
@@ -670,6 +708,30 @@ export default function AttendanceHistory() {
               )}
             </div>
           </div>
+
+          {/* Pesan hasil cleanup */}
+          {cleanupMsg && (
+            <div style={{
+              margin: '0 16px 12px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              background: cleanupMsg.startsWith('✓') ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${cleanupMsg.startsWith('✓') ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              color: cleanupMsg.startsWith('✓') ? 'var(--color-success-light)' : 'var(--color-danger-light)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <span>{cleanupMsg}</span>
+              <button
+                onClick={() => setCleanupMsg(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '16px', lineHeight: 1, padding: '0 4px' }}
+              >
+                <LuX size={14} />
+              </button>
+            </div>
+          )}
           <div className="table-container">
             <table className="table">
               <thead>

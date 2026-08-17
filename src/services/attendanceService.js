@@ -448,3 +448,35 @@ export const getAttendanceStatus = (item) => {
   return item.status || 'Hadir';
 };
 
+/**
+ * Hapus semua log absensi yang fingerprintId-nya sudah tidak terdaftar
+ * di koleksi `users` (peserta sudah dihapus dari sistem).
+ * Dipakai untuk membersihkan data lama yang menumpuk.
+ *
+ * @returns {{ deletedCount: number, checkedCount: number }}
+ */
+export const deleteOrphanAttendanceLogs = async () => {
+  // 1. Ambil semua fingerprintId aktif dari users
+  const usersSnap = await getDocs(collection(db, 'users'));
+  const activeFingerprintIds = new Set(
+    usersSnap.docs
+      .map(d => d.data().fingerprintId)
+      .filter(id => id !== null && id !== undefined)
+      .map(Number)
+  );
+
+  // 2. Ambil semua attendance_logs
+  const logsSnap = await getDocs(collection(db, ATTENDANCE_COLLECTION));
+
+  let deletedCount = 0;
+  for (const logDoc of logsSnap.docs) {
+    const fid = logDoc.data().fingerprintId;
+    // Log dianggap yatim jika fingerprintId-nya tidak ada di users aktif
+    if (fid !== null && fid !== undefined && !activeFingerprintIds.has(Number(fid))) {
+      await deleteDoc(doc(db, ATTENDANCE_COLLECTION, logDoc.id));
+      deletedCount++;
+    }
+  }
+
+  return { deletedCount, checkedCount: logsSnap.docs.length };
+};

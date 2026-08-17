@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
   LuSun, LuMoon, LuMonitor, LuRotateCcw, LuType, LuCheck, LuRefreshCw,
-  LuWifi, LuWifiOff, LuUsb, LuSave, LuExternalLink, LuTriangleAlert, LuTerminal
+  LuWifi, LuWifiOff, LuUsb, LuSave, LuExternalLink, LuTriangleAlert, LuTerminal, LuTrash2
 } from 'react-icons/lu';
 import { useTheme } from '../hooks/useTheme';
 import { publishResetRequest } from '../components/MqttListener';
 import DebugLogsViewer from '../components/DebugLogsViewer';
+import { deleteOrphanAttendanceLogs } from '../services/attendanceService';
 
 export default function Settings() {
   const { theme, setThemeMode, fontSize, setFontSize } = useTheme();
@@ -30,6 +31,10 @@ export default function Settings() {
   // Debug mode state
   const [debugMode, setDebugMode] = useState(() => localStorage.getItem('debugMode') === 'true');
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
+  // Cleanup orphan logs state
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState(null);
 
   const toggleDebugMode = () => {
     const newVal = !debugMode;
@@ -445,7 +450,73 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ── Section 5: Mode Pengembang / Debug ── */}
+      {/* ── Section 5: Manajemen Data ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuRotateCcw /> Manajemen Data</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">
+            Bersihkan data log absensi yang ditinggalkan oleh peserta yang sudah dihapus dari sistem.
+            Fitur ini berguna jika di rekap absensi masih muncul nama peserta lama.
+          </p>
+
+          <div style={{ marginTop: '16px', padding: '16px', backgroundColor: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <strong style={{ display: 'block', marginBottom: '4px', color: 'var(--text-primary)' }}>
+              Bersihkan Log Absensi Peserta Tidak Aktif
+            </strong>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '12px' }}>
+              Menghapus semua catatan absensi dari peserta yang sudah dihapus.
+              Data peserta aktif tidak akan terpengaruh.
+            </span>
+
+            {cleanupResult && (
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                marginBottom: '12px',
+                fontSize: '13px',
+                backgroundColor: cleanupResult.deletedCount > 0
+                  ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
+                border: `1px solid ${cleanupResult.deletedCount > 0
+                  ? 'rgba(16,185,129,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                color: cleanupResult.deletedCount > 0
+                  ? 'var(--color-success-light)' : 'var(--color-info-light)',
+              }}>
+                {cleanupResult.deletedCount > 0
+                  ? `Berhasil menghapus ${cleanupResult.deletedCount} log dari ${cleanupResult.checkedCount} total log yang diperiksa.`
+                  : `Tidak ada log yatim ditemukan. Semua ${cleanupResult.checkedCount} log sudah bersih.`
+                }
+              </div>
+            )}
+
+            <button
+              className="btn btn--danger"
+              id="cleanup-orphan-logs-btn"
+              disabled={cleanupLoading}
+              onClick={async () => {
+                if (!window.confirm(
+                  'Apakah Anda yakin ingin menghapus semua log absensi dari peserta yang sudah dihapus?\n\nLog absensi peserta aktif tidak akan terpengaruh.'
+                )) return;
+                setCleanupLoading(true);
+                setCleanupResult(null);
+                try {
+                  const result = await deleteOrphanAttendanceLogs();
+                  setCleanupResult(result);
+                } catch (err) {
+                  alert('Gagal membersihkan log: ' + err.message);
+                } finally {
+                  setCleanupLoading(false);
+                }
+              }}
+            >
+              {cleanupLoading ? 'Sedang membersihkan...' : <><LuTrash2 /> Bersihkan Log Lama</>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Section 6: Mode Pengembang / Debug ── */}
       <div className="card settings-card">
         <div className="card-header">
           <h2><LuTerminal /> Mode Pengembang & Debug</h2>

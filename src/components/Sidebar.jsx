@@ -1,6 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSettings, LuPanelLeftClose, LuPanelLeftOpen } from 'react-icons/lu';
+import { LuLayoutDashboard, LuUsers, LuCalendarDays, LuMapPin, LuSettings, LuPanelLeftClose, LuPanelLeftOpen, LuLogOut } from 'react-icons/lu';
+import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
   { path: '/', icon: <LuLayoutDashboard />, label: 'Dashboard' },
@@ -11,6 +12,7 @@ const menuItems = [
 ];
 
 export default function Sidebar({ collapsed = false, onToggle, zoomLevel }) {
+  const { logout } = useAuth();
 
 
   // ── Tap 5x pada judul untuk mengaktifkan debug mode ──
@@ -83,6 +85,17 @@ export default function Sidebar({ collapsed = false, onToggle, zoomLevel }) {
               {zoomLevel}%
             </span>
           )}
+
+          {/* Tombol Logout */}
+          <button
+            className="sidebar-logout-btn"
+            onClick={logout}
+            title="Keluar dari Aplikasi"
+          >
+            <LuLogOut size={16} />
+            {!collapsed && <span>Keluar</span>}
+          </button>
+
           {!collapsed && (
             <>
               <p>© 2026 Sistem Absensi</p>

@@ -1,23 +1,29 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import ScanProcessor from './components/ScanProcessor';
 import MqttListener from './components/MqttListener';
 import DebugButton from './components/DebugButton';
+import ProtectedRoute from './components/ProtectedRoute';
 import { initGlobalErrorHandler } from './services/debugService';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const UserManagement = lazy(() => import('./pages/UserManagement'));
+const Dashboard       = lazy(() => import('./pages/Dashboard'));
+const UserManagement  = lazy(() => import('./pages/UserManagement'));
 const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory'));
-const SidediInternship = lazy(() => import('./pages/SidediInternship'));
-const Settings = lazy(() => import('./pages/Settings'));
+const SidediInternship  = lazy(() => import('./pages/SidediInternship'));
+const Settings        = lazy(() => import('./pages/Settings'));
+const Login           = lazy(() => import('./pages/Login'));
 
-const ZOOM_MIN = 50;
-const ZOOM_MAX = 200;
+const ZOOM_MIN  = 50;
+const ZOOM_MAX  = 200;
 const ZOOM_STEP = 10;
-const ZOOM_KEY = 'app-zoom-level';
+const ZOOM_KEY  = 'app-zoom-level';
 
-export default function App() {
+/* ─── Layout utama (hanya ditampilkan jika sudah login) ─── */
+function AppLayout() {
+  const { isAuthenticated } = useAuth();
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebar-collapsed') === 'true';
   });
@@ -90,29 +96,49 @@ export default function App() {
 
   const layoutClass = `app-layout${sidebarCollapsed ? ' sidebar-collapsed' : ''}`;
 
+  // Background workers hanya aktif saat sudah login
   return (
-    <Router>
-      <ScanProcessor />
-      <MqttListener />
-      <DebugButton />
+    <>
+      {isAuthenticated && <ScanProcessor />}
+      {isAuthenticated && <MqttListener />}
+      {isAuthenticated && <DebugButton />}
       <div className={layoutClass}>
-        <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} zoomLevel={zoomLevel} />
-        <main className="main-content">
+        {isAuthenticated && (
+          <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} zoomLevel={zoomLevel} />
+        )}
+        <main className={isAuthenticated ? 'main-content' : 'main-content--full'}>
           <Suspense fallback={
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'var(--text-muted)' }}>
               Memuat halaman...
             </div>
           }>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/peserta" element={<UserManagement />} />
-              <Route path="/riwayat" element={<AttendanceHistory />} />
-              <Route path="/magang-sidedi" element={<SidediInternship />} />
-              <Route path="/pengaturan" element={<Settings />} />
+              {/* Route publik */}
+              <Route path="/login" element={<Login />} />
+
+              {/* Routes yang diproteksi login */}
+              <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/peserta" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+              <Route path="/riwayat" element={<ProtectedRoute><AttendanceHistory /></ProtectedRoute>} />
+              <Route path="/magang-sidedi" element={<ProtectedRoute><SidediInternship /></ProtectedRoute>} />
+              <Route path="/pengaturan" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </main>
       </div>
-    </Router>
+    </>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppLayout />
+      </Router>
+    </AuthProvider>
+  );
+}
