@@ -21,6 +21,7 @@ const mockAddDoc    = vi.fn();
 const mockUpdateDoc = vi.fn();
 const mockDeleteDoc = vi.fn();
 const mockGetDocs   = vi.fn();
+const mockGetDoc    = vi.fn(() => Promise.resolve({ exists: () => false }));
 const mockDoc       = vi.fn((db, col, id) => ({ _db: db, _col: col, _id: id }));
 const mockCollection = vi.fn((db, name) => ({ _db: db, _name: name }));
 const mockQuery     = vi.fn((...args) => ({ _args: args }));
@@ -33,6 +34,7 @@ vi.mock('firebase/firestore', () => ({
   updateDoc:  (...args) => mockUpdateDoc(...args),
   deleteDoc:  (...args) => mockDeleteDoc(...args),
   getDocs:    (...args) => mockGetDocs(...args),
+  getDoc:     (...args) => mockGetDoc(...args),
   doc:        (...args) => mockDoc(...args),
   collection: (...args) => mockCollection(...args),
   query:      (...args) => mockQuery(...args),

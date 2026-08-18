@@ -17,14 +17,49 @@ import { getDayType } from './holidayService';
 
 const ATTENDANCE_COLLECTION = 'attendance_logs';
 
-// Konfigurasi jam kerja
+// Konfigurasi jam kerja default (sebagai fallback)
 const WORK_SCHEDULE = {
   checkInDeadline: { hour: 7, minute: 30 }, // Batas jam masuk (07:30)
+  checkInDeadlineFriday: { hour: 7, minute: 30 }, // Batas jam masuk jumat (07:30)
   checkOutTime: {
     default: { hour: 16, minute: 0 },  // Senin-Kamis: 16:00
     friday: { hour: 14, minute: 30 },   // Jumat: 14:30
   },
+  earliestCheckOut: { hour: 12, minute: 0 },
   offDays: [0, 6], // 0 = Minggu, 6 = Sabtu
+};
+
+// Memuat konfigurasi jam kerja dinamis dari Firestore (dengan fallback ke nilai default)
+export const getWorkSchedule = async () => {
+  try {
+    const docRef = doc(db, 'system_settings', 'work_schedule');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      const parseTime = (timeStr, defaultTime) => {
+        if (!timeStr) return defaultTime;
+        const [h, m] = timeStr.split(':').map(Number);
+        return { 
+          hour: isNaN(h) ? defaultTime.hour : h, 
+          minute: isNaN(m) ? defaultTime.minute : m 
+        };
+      };
+      
+      return {
+        checkInDeadline: parseTime(data.checkInDeadline, WORK_SCHEDULE.checkInDeadline),
+        checkInDeadlineFriday: parseTime(data.checkInDeadlineFriday, WORK_SCHEDULE.checkInDeadlineFriday),
+        checkOutTime: {
+          default: parseTime(data.checkOutTimeDefault, WORK_SCHEDULE.checkOutTime.default),
+          friday: parseTime(data.checkOutTimeFriday, WORK_SCHEDULE.checkOutTime.friday),
+        },
+        earliestCheckOut: parseTime(data.earliestCheckOut, WORK_SCHEDULE.earliestCheckOut),
+        offDays: data.offDays || WORK_SCHEDULE.offDays,
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching work schedule settings:', error);
+  }
+  return WORK_SCHEDULE;
 };
 
 export const getTodayDate = () => {
@@ -43,12 +78,11 @@ export const isFriday = (date = new Date()) => {
   return date.getDay() === 5;
 };
 
-export const determineStatus = (checkInTime) => {
-  const deadline = WORK_SCHEDULE.checkInDeadline;
+export const determineStatus = (checkInTime, checkInDeadline = WORK_SCHEDULE.checkInDeadline) => {
   const hours = checkInTime.getHours();
   const minutes = checkInTime.getMinutes();
 
-  if (hours < deadline.hour || (hours === deadline.hour && minutes <= deadline.minute)) {
+  if (hours < checkInDeadline.hour || (hours === checkInDeadline.hour && minutes <= checkInDeadline.minute)) {
     return 'Hadir';
   }
   return 'Terlambat';
@@ -118,6 +152,17 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
   if (dayType === 'weekend') {
     return { success: false, message: 'Hari ini adalah hari libur akhir pekan (Sabtu/Minggu), absensi tidak diizinkan.' };
   }
+  // Ambil jadwal jam kerja dinamis dari Firestore
+  const schedule = await getWorkSchedule();
+  const isTodayFriday = isFriday(now);
+  const deadline = isTodayFriday && schedule.checkInDeadlineFriday 
+    ? schedule.checkInDeadlineFriday 
+    : schedule.checkInDeadline;
+
+  const earliestCheckOut = schedule.earliestCheckOut || { hour: 12, minute: 0 };
+  const checkOutLimitMinutes = earliestCheckOut.hour * 60 + earliestCheckOut.minute;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const isAfterLimit = currentMinutes >= checkOutLimitMinutes;
 
   // Ambil snapshot data user dari database
   let userSnapshotData = {};
@@ -142,8 +187,8 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
 
   if (snapshot.empty) {
     // Belum ada record → buat record baru (CHECK IN)
-    const status = determineStatus(now);
-    const isAfternoon = now.getHours() >= 12;
+    const status = determineStatus(now, deadline);
+    const isAfternoon = isAfterLimit;
     const finalStatus = status === 'Hadir' ? 'Hadir (KOMINFO)' : 'Terlambat (KOMINFO)';
     
     await addDoc(collection(db, ATTENDANCE_COLLECTION), {
@@ -184,11 +229,12 @@ export const processAttendanceScan = async (fingerprintId, userName = 'Unknown',
       };
     }
 
-    // Cek apakah waktu sekarang sebelum jam 12:00
-    if (now.getHours() < 12) {
+    // Cek apakah waktu sekarang sebelum jam batas awal check-out
+    if (!isAfterLimit) {
+      const formattedLimit = `${String(earliestCheckOut.hour).padStart(2, '0')}:${String(earliestCheckOut.minute).padStart(2, '0')}`;
       return {
         success: false,
-        message: 'Absen keluar hanya diperbolehkan setelah jam 12:00 siang',
+        message: `Absen keluar hanya diperbolehkan setelah jam ${formattedLimit} siang`,
       };
     }
 

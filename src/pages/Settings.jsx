@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LuSun, LuMoon, LuMonitor, LuRotateCcw, LuType, LuCheck, LuRefreshCw,
-  LuWifi, LuWifiOff, LuUsb, LuSave, LuExternalLink, LuTriangleAlert, LuTerminal, LuTrash2
+  LuWifi, LuWifiOff, LuUsb, LuSave, LuExternalLink, LuTriangleAlert, LuTerminal, LuTrash2,
+  LuClock
 } from 'react-icons/lu';
 import { useTheme } from '../hooks/useTheme';
 import { publishResetRequest } from '../components/MqttListener';
 import DebugLogsViewer from '../components/DebugLogsViewer';
 import { deleteOrphanAttendanceLogs } from '../services/attendanceService';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
 
 export default function Settings() {
   const { theme, setThemeMode, fontSize, setFontSize } = useTheme();
@@ -23,6 +26,57 @@ export default function Settings() {
   const [usbPort, setUsbPort] = useState(null);
   const [wifiStatus, setWifiStatus] = useState(null);
   const [isSavingWifi, setIsSavingWifi] = useState(false);
+
+  // Operational Hours state
+  const [checkInDeadline, setCheckInDeadline] = useState('07:30');
+  const [checkInDeadlineFriday, setCheckInDeadlineFriday] = useState('07:30');
+  const [checkOutTimeDefault, setCheckOutTimeDefault] = useState('16:00');
+  const [checkOutTimeFriday, setCheckOutTimeFriday] = useState('14:30');
+  const [earliestCheckOut, setEarliestCheckOut] = useState('12:00');
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
+  const [saveScheduleStatus, setSaveScheduleStatus] = useState(null);
+
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      try {
+        const docRef = doc(db, 'system_settings', 'work_schedule');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.checkInDeadline) setCheckInDeadline(data.checkInDeadline);
+          if (data.checkInDeadlineFriday) setCheckInDeadlineFriday(data.checkInDeadlineFriday);
+          if (data.checkOutTimeDefault) setCheckOutTimeDefault(data.checkOutTimeDefault);
+          if (data.checkOutTimeFriday) setCheckOutTimeFriday(data.checkOutTimeFriday);
+          if (data.earliestCheckOut) setEarliestCheckOut(data.earliestCheckOut);
+        }
+      } catch (err) {
+        console.error('Error fetching work schedule:', err);
+      } finally {
+        setIsLoadingSchedule(false);
+      }
+    };
+    fetchSchedule();
+  }, []);
+
+  const handleSaveSchedule = async (e) => {
+    e.preventDefault();
+    setSaveScheduleStatus({ type: 'info', msg: 'Menyimpan jadwal...' });
+    try {
+      const docRef = doc(db, 'system_settings', 'work_schedule');
+      await setDoc(docRef, {
+        checkInDeadline,
+        checkInDeadlineFriday,
+        checkOutTimeDefault,
+        checkOutTimeFriday,
+        earliestCheckOut
+      }, { merge: true });
+      setSaveScheduleStatus({ type: 'success', msg: 'Jadwal berhasil diperbarui.' });
+      setTimeout(() => setSaveScheduleStatus(null), 3000);
+    } catch (err) {
+      console.error('Error saving work schedule:', err);
+      setSaveScheduleStatus({ type: 'error', msg: 'Gagal menyimpan: ' + err.message });
+    }
+  };
 
   // Halaman dashboard ini sedang HTTPS atau tidak (menentukan apakah fetch ke
   // ESP32 (http://) akan diblokir browser sebagai "mixed content")
@@ -254,7 +308,126 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* ── Section 3: Pengaturan Koneksi WiFi ESP32 ── */}
+      {/* ── Section 3: Jam Operasional Kerja ── */}
+      <div className="card settings-card">
+        <div className="card-header">
+          <h2><LuClock /> Jam Operasional Kerja</h2>
+        </div>
+        <div className="settings-card__body">
+          <p className="settings-description">
+            Atur batas waktu masuk dan jam pulang untuk hari kerja biasa maupun khusus hari Jumat.
+          </p>
+
+          {isLoadingSchedule ? (
+            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+              <LuRefreshCw className="spin" style={{ marginRight: '8px' }} /> Memuat pengaturan...
+            </div>
+          ) : (
+            <form onSubmit={handleSaveSchedule} style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '12px' }}>
+              
+              {/* Alert Status Simpan */}
+              {saveScheduleStatus && (
+                <div className={`alert alert--${saveScheduleStatus.type === 'success' ? 'success' : saveScheduleStatus.type === 'error' ? 'danger' : 'info'}`} style={{ margin: 0 }}>
+                  {saveScheduleStatus.msg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                
+                {/* Modul Hari Kerja Normal */}
+                <div style={{ padding: '16px', backgroundColor: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: 'var(--text-primary)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-primary)' }}></span>
+                    Hari Kerja (Senin – Kamis)
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label className="form-label" style={{ fontWeight: '500', color: 'var(--text-primary)' }}>Batas Jam Masuk</label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={checkInDeadline}
+                        onChange={(e) => setCheckInDeadline(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Toleransi keterlambatan setelah jam ini.</span>
+                    </div>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label className="form-label" style={{ fontWeight: '500', color: 'var(--text-primary)' }}>Jam Pulang Kerja</label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={checkOutTimeDefault}
+                        onChange={(e) => setCheckOutTimeDefault(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modul Khusus Jumat */}
+                <div style={{ padding: '16px', backgroundColor: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', color: 'var(--text-primary)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
+                    Hari Jumat (Khusus)
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label className="form-label" style={{ fontWeight: '500', color: 'var(--text-primary)' }}>Batas Jam Masuk Jumat</label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={checkInDeadlineFriday}
+                        onChange={(e) => setCheckInDeadlineFriday(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label className="form-label" style={{ fontWeight: '500', color: 'var(--text-primary)' }}>Jam Pulang Jumat</label>
+                      <input
+                        type="time"
+                        className="form-control"
+                        value={checkOutTimeFriday}
+                        onChange={(e) => setCheckOutTimeFriday(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Batas Awal Mulai Absen Pulang */}
+              <div style={{ padding: '16px', backgroundColor: 'var(--bg-input)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label className="form-label" style={{ fontWeight: '600', display: 'block', marginBottom: '6px', color: 'var(--text-primary)' }}>Batas Mulai Absen Pulang (Earliest Check-Out)</label>
+                  <input
+                    type="time"
+                    className="form-control"
+                    value={earliestCheckOut}
+                    onChange={(e) => setEarliestCheckOut(e.target.value)}
+                    required
+                    style={{ width: '200px', padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', display: 'block' }}
+                  />
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginTop: '6px' }}>
+                    Sistem tidak akan memproses scan pulang (check-out) jika dilakukan sebelum jam ini.
+                  </span>
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn--primary" style={{ alignSelf: 'flex-start', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <LuSave /> Simpan Pengaturan Jam Kerja
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* ── Section 4: Pengaturan Koneksi WiFi ESP32 ── */}
       <div className="card settings-card">
         <div className="card-header">
           <h2><LuWifi /> Koneksi WiFi ESP32</h2>
