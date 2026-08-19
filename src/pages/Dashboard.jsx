@@ -90,6 +90,21 @@ export default function Dashboard() {
     fetchDayStatus();
   }, [attendance]);
 
+  // Sync rowRatings to use users' historical progress as initial values
+  useEffect(() => {
+    if (activeUsers.length > 0) {
+      setRowRatings(prev => {
+        const next = { ...prev };
+        activeUsers.forEach(u => {
+          if (next[u.id] === undefined) {
+            next[u.id] = u.progress !== undefined && u.progress !== null ? Number(u.progress) : 0;
+          }
+        });
+        return next;
+      });
+    }
+  }, [activeUsers]);
+
   // Calculate statistics — separated by KOMINFO and SIDEDI
   const izinCount = attendance.filter((a) => a.location === 'izin').length;
 
@@ -515,7 +530,8 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {unconfirmedSidediUsers.map(user => {
-                  const currentRating = rowRatings[user.id] !== undefined ? rowRatings[user.id] : 50;
+                  const minProgress = user.progress !== undefined && user.progress !== null ? Number(user.progress) : 0;
+                  const currentRating = rowRatings[user.id] !== undefined ? rowRatings[user.id] : minProgress;
                   return (
                     <tr key={user.id}>
                       <td className="td-name">{user.name}</td>
@@ -524,7 +540,7 @@ export default function Dashboard() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <input 
                             type="range" 
-                            min="0" 
+                            min={minProgress} 
                             max="100" 
                             step="5"
                             value={currentRating} 

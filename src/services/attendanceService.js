@@ -264,10 +264,12 @@ export const confirmSidediAttendance = async (fingerprintId, userName, division 
 
   // Ambil snapshot data user dari database
   let userSnapshotData = {};
+  let userDocId = null;
   try {
     const userQuery = query(collection(db, 'users'), where('fingerprintId', '==', Number(fingerprintId)));
     const userSnapshot = await getDocs(userQuery);
     if (!userSnapshot.empty) {
+      userDocId = userSnapshot.docs[0].id;
       userSnapshotData = userSnapshot.docs[0].data();
     }
   } catch (err) {
@@ -307,6 +309,18 @@ export const confirmSidediAttendance = async (fingerprintId, userName, division 
       location: 'sidedi',
       progress: Number(progress)
     });
+
+    // Update progress terakhir di dokumen user
+    if (userDocId) {
+      try {
+        await updateDoc(doc(db, 'users', userDocId), {
+          progress: Number(progress)
+        });
+      } catch (userUpdateErr) {
+        console.error('Failed to update user progress:', userUpdateErr);
+      }
+    }
+
     return { success: true, message: 'Kehadiran SIDEDI dikonfirmasi' };
   } else {
     return { success: false, message: 'Peserta sudah absen hari ini.' };
