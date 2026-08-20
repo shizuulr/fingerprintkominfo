@@ -123,9 +123,14 @@ export default function AttendanceHistory() {
       return;
     }
 
+    const formatIndo = (dateStr) => {
+      if (!dateStr) return '';
+      return new Date(dateStr + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+
     const periodLabel = filterType === 'single'
-      ? `Tanggal ${selectedDate}`
-      : `Rentang ${startDate} s/d ${endDate}`;
+      ? `Tanggal ${formatIndo(selectedDate)}`
+      : `Rentang ${formatIndo(startDate)} s/d ${formatIndo(endDate)}`;
 
     const printWindow = window.open('', '_blank', 'width=1200,height=900');
     if (!printWindow) {
@@ -566,7 +571,6 @@ export default function AttendanceHistory() {
     if (!dateStr) return '-';
     const date = new Date(dateStr + 'T00:00:00');
     return date.toLocaleDateString('id-ID', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric',

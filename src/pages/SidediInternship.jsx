@@ -344,7 +344,7 @@ export default function SidediInternship() {
       </table>
       <div class="keterangan">
         <strong>Keterangan:</strong> D = Desa (SIDEDI) | K = Kantor (KOMINFO) | <span style="background:#fee2e2;padding:1px 4px;">Merah</span> = Libur/Cuti Bersama<br/>
-        <em>Dicetak pada: ${new Date().toLocaleString('id-ID')}</em>
+        <em>Dicetak pada: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</em>
       </div>`;
 
     printWindow.document.write(`<html><head><title>Cetak Rekap Penjadwalan</title></head><body>${tableHtml}<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script></body></html>`);

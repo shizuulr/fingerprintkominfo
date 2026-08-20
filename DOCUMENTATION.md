@@ -724,3 +724,10 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
 - **Implementasi Utama**:
   - **`MqttListener.jsx`**: Menambahkan *interval publisher* yang secara otomatis mengirim payload JSON berisi *timestamp* ke topik MQTT `absensipkl_temanggung_2026/web_heartbeat` setiap 10 detik. Pesan ini dikirim secara eksplisit dengan flag `{ retain: true }` supaya ESP32 yang baru saja di-*reboot* bisa langsung mendeteksi status *heartbeat* web terakhir tanpa menunggu interval 10 detik berikutnya.
   - **`Dashboard.jsx`**: Menambahkan antarmuka visual berupa *badge indicator* berdenyut (menyerupai *live-clock dot*) di kanan atas layar. Indikator ini melakukan *polling* setiap 3 detik terhadap koneksi MQTT dan akan berwarna Hijau saat terhubung (*Heartbeat aktif*) atau Merah saat terputus (*ESP32 mode HTTPS*).
+
+### 20.11. Standardisasi Format Penanggalan Laporan PDF / Unduh Rekap (Agustus 2026)
+- **Latar Belakang**: Memastikan seluruh hasil unduhan laporan dan cetak dokumen rekap absensi menggunakan format penanggalan standar Indonesia formal yang baku dan mudah dibaca (misalnya "17 Agustus 2026" dan "12 Agustus 2026 s/d 20 Agustus 2026").
+- **Implementasi Utama**:
+  - **`Dashboard.jsx` (Ringkasan Absensi Global)**: Mengubah format penanggalan pada baris tabel rekap dan judul periode cetak dari format ISO/angka (`YYYY-MM-DD`) menjadi format Indonesia panjang (`d MMMM yyyy`), serta menyelaraskan teks *Dicetak pada* menjadi format tanggal yang sama.
+  - **`AttendanceHistory.jsx` (Riwayat Absensi)**: Menyelaraskan teks judul periode unduh ("Tanggal 17 Agustus 2026" atau "Rentang 12 Agustus 2026 s/d 20 Agustus 2026") dan kolom tanggal tabel agar konsisten menampilkan tanggal tanpa nama hari berlebih pada cetakan.
+  - **`SidediInternship.jsx` (Penjadwalan Magang SIDEDI)**: Menyesuaikan catatan kaki cetak (*footer* cetak dokumen) ke format standar Indonesia formal.

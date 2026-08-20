@@ -131,8 +131,8 @@ export default function Dashboard() {
     return activeUsers.find(u => u.id === schedule.userId);
   }).filter(user => {
     if (!user) return false;
-    const hasAttended = attendance.some(a => 
-      (a.fingerprintId && a.fingerprintId === user.fingerprintId) || 
+    const hasAttended = attendance.some(a =>
+      (a.fingerprintId && a.fingerprintId === user.fingerprintId) ||
       a.userName === user.name
     );
     return !hasAttended;
@@ -147,8 +147,8 @@ export default function Dashboard() {
     if (isSidedi) return false;
 
     // Has user attended or izin today?
-    const hasAttended = attendance.some(a => 
-      (a.fingerprintId && a.fingerprintId === user.fingerprintId) || 
+    const hasAttended = attendance.some(a =>
+      (a.fingerprintId && a.fingerprintId === user.fingerprintId) ||
       a.userName === user.name
     );
     return !hasAttended;
@@ -237,21 +237,21 @@ export default function Dashboard() {
       return;
     }
     if (window.confirm(`Konfirmasi kehadiran di desa untuk ${user.name} dengan progress ${progress}%?`)) {
-       try {
-          const result = await confirmSidediAttendance(
-            user.fingerprintId,
-            user.name,
-            user.division || '',
-            progress
-          );
-          if (result.success) {
-             alert(result.message);
-          } else {
-             alert('Gagal: ' + result.message);
-          }
-       } catch (error) {
-          alert('Terjadi kesalahan: ' + error.message);
-       }
+      try {
+        const result = await confirmSidediAttendance(
+          user.fingerprintId,
+          user.name,
+          user.division || '',
+          progress
+        );
+        if (result.success) {
+          alert(result.message);
+        } else {
+          alert('Gagal: ' + result.message);
+        }
+      } catch (error) {
+        alert('Terjadi kesalahan: ' + error.message);
+      }
     }
   };
 
@@ -307,9 +307,9 @@ export default function Dashboard() {
     setIsPrinting(true);
     try {
       const logs = await getAttendanceByDateRange(startDate, endDate);
-      
+
       const printWindow = window.open('', '', 'width=1100,height=800');
-      
+
       let html = `
         <html>
         <head>
@@ -345,7 +345,7 @@ export default function Dashboard() {
           <div class="kop-line"></div>
 
           <h2>REKAPITULASI ABSENSI GLOBAL</h2>
-          <h3 class="text-center" style="font-weight: normal; margin-bottom: 15px;">Periode: ${startDate} s/d ${endDate}</h3>
+          <h3 class="text-center" style="font-weight: normal; margin-bottom: 15px;">Periode: ${new Date(startDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} s/d ${new Date(endDate + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</h3>
           <table>
             <thead>
               <tr>
@@ -369,18 +369,21 @@ export default function Dashboard() {
         logs.forEach((item, idx) => {
           const checkIn = item.checkIn ? new Date(item.checkIn).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
           const checkOut = item.checkOut ? new Date(item.checkOut).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
-          
+
           const matchedUser = activeUsers.find(u => u.fingerprintId === item.fingerprintId);
-          const pklDuration = matchedUser && matchedUser.startDate && matchedUser.endDate 
-            ? `${matchedUser.startDate} s/d ${matchedUser.endDate}` 
+          const pklDuration = matchedUser && matchedUser.startDate && matchedUser.endDate
+            ? `${matchedUser.startDate} s/d ${matchedUser.endDate}`
             : '-';
-            
+
           const displayId = getDisplayId(item.fingerprintId, item.division || (matchedUser ? matchedUser.division : ''));
           const penempatan = item.location === 'sidedi' ? 'Desa (SIDEDI)' : 'Kantor (KOMINFO)';
 
+          // Format tanggal "17 Agustus 2026"
+          const formattedDate = new Date(item.date + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
           html += '<tr>' +
             '<td class="text-center">' + (idx + 1) + '</td>' +
-            '<td class="text-center">' + item.date + '</td>' +
+            '<td class="text-center">' + formattedDate + '</td>' +
             '<td>' + item.userName + '</td>' +
             '<td class="text-center">' + displayId + '</td>' +
             '<td class="text-center">' + pklDuration + '</td>' +
@@ -392,11 +395,13 @@ export default function Dashboard() {
         });
       }
 
+      const printedAt = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
       html += `
             </tbody>
           </table>
           <p style="text-align: right; margin-top: 30px;">
-            Dicetak pada: ${new Date().toLocaleString('id-ID')}
+            Dicetak pada: ${printedAt}
           </p>
           <script>
             window.onload = function() {
@@ -527,225 +532,225 @@ export default function Dashboard() {
             </>
           )}
 
-      {/* Konfirmasi Magang SIDEDI */}
-      {unconfirmedSidediUsers.length > 0 && (
-        <div className="card" style={{ marginBottom: '20px', borderLeft: '4px solid #10b981' }}>
-          <div className="card-header">
-            <h2>Konfirmasi Kehadiran Magang Desa (SIDEDI)</h2>
-            <span className="badge badge--warning">{unconfirmedSidediUsers.length} Menunggu</span>
-          </div>
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Nama Peserta</th>
-                  <th>ID Fingerprint</th>
-                  <th style={{ width: '180px' }}>Progress Kerja</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unconfirmedSidediUsers.map(user => {
-                  const minProgress = user.progress !== undefined && user.progress !== null ? Number(user.progress) : 0;
-                  const currentRating = rowRatings[user.id] !== undefined ? rowRatings[user.id] : minProgress;
-                  return (
-                    <tr key={user.id}>
-                      <td className="td-name">{user.name}</td>
-                      <td>{user.fingerprintId ? getDisplayId(user.fingerprintId, user.division) : 'Belum Enroll'}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <input 
-                            type="range" 
-                            min={minProgress} 
-                            max="100" 
-                            step="5"
-                            value={currentRating} 
-                            onChange={(e) => setRowRatings(prev => ({ ...prev, [user.id]: parseInt(e.target.value) }))}
-                            style={{ flex: 1, accentColor: 'var(--color-success)', cursor: 'pointer' }}
-                          />
-                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-success-light)', minWidth: '35px' }}>{currentRating}%</span>
-                        </div>
-                      </td>
-                      <td>
-                        <button 
-                          className="btn btn--primary" 
-                          onClick={() => handleConfirmSidediDirect(user, currentRating)}
-                          style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center' }}
-                        >
-                          <LuCheck style={{ marginRight: '5px' }}/> Konfirmasi Hadir
-                        </button>
+          {/* Konfirmasi Magang SIDEDI */}
+          {unconfirmedSidediUsers.length > 0 && (
+            <div className="card" style={{ marginBottom: '20px', borderLeft: '4px solid #10b981' }}>
+              <div className="card-header">
+                <h2>Konfirmasi Kehadiran Magang Desa (SIDEDI)</h2>
+                <span className="badge badge--warning">{unconfirmedSidediUsers.length} Menunggu</span>
+              </div>
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Nama Peserta</th>
+                      <th>ID Fingerprint</th>
+                      <th style={{ width: '180px' }}>Progress Kerja</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unconfirmedSidediUsers.map(user => {
+                      const minProgress = user.progress !== undefined && user.progress !== null ? Number(user.progress) : 0;
+                      const currentRating = rowRatings[user.id] !== undefined ? rowRatings[user.id] : minProgress;
+                      return (
+                        <tr key={user.id}>
+                          <td className="td-name">{user.name}</td>
+                          <td>{user.fingerprintId ? getDisplayId(user.fingerprintId, user.division) : 'Belum Enroll'}</td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <input
+                                type="range"
+                                min={minProgress}
+                                max="100"
+                                step="5"
+                                value={currentRating}
+                                onChange={(e) => setRowRatings(prev => ({ ...prev, [user.id]: parseInt(e.target.value) }))}
+                                style={{ flex: 1, accentColor: 'var(--color-success)', cursor: 'pointer' }}
+                              />
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-success-light)', minWidth: '35px' }}>{currentRating}%</span>
+                            </div>
+                          </td>
+                          <td>
+                            <button
+                              className="btn btn--primary"
+                              onClick={() => handleConfirmSidediDirect(user, currentRating)}
+                              style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <LuCheck style={{ marginRight: '5px' }} /> Konfirmasi Hadir
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Izin / Permission Section */}
+          {usersWithoutAttendance.length > 0 && (
+            <div className="card" style={{ marginBottom: '20px', borderLeft: '4px solid var(--color-primary)' }}>
+              <div className="card-header">
+                <h2><LuShieldCheck style={{ marginRight: '8px' }} /> Berikan Izin Peserta</h2>
+                <span className="badge badge--default">{usersWithoutAttendance.length} Belum Absen</span>
+              </div>
+              <div className="table-container">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '60px' }}>No</th>
+                      <th>Nama Peserta</th>
+                      <th>Sekolah</th>
+                      <th>Nomor HP</th>
+                      <th>ID Fingerprint</th>
+                      <th>Divisi</th>
+                      <th>Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usersWithoutAttendance.map((user, index) => (
+                      <tr key={user.id}>
+                        <td>{index + 1}</td>
+                        <td className="td-name">{user.name}</td>
+                        <td>{user.institution || user.school || '-'}</td>
+                        <td>{user.phone || '-'}</td>
+                        <td>
+                          <code className="fingerprint-id">{getDisplayId(user.fingerprintId, user.division)}</code>
+                        </td>
+                        <td>{user.division || '-'}</td>
+                        <td>
+                          <button
+                            className="btn btn--secondary"
+                            onClick={() => openLeaveModal(user)}
+                            style={{ padding: '6px 14px', fontSize: '12px', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            <LuShieldCheck style={{ marginRight: '5px' }} /> Beri Izin
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Attendance Table */}
+          <div className="card">
+            <div className="card-header">
+              <h2>Daftar Absensi Hari Ini</h2>
+              <span className="badge badge--info">{attendance.length} orang</span>
+            </div>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    <th>Nama Peserta</th>
+                    <th>ID Fingerprint</th>
+                    <th>Lokasi</th>
+                    <th>Jam Masuk</th>
+                    <th>Jam Keluar</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendance.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="table-empty">
+                        Belum ada data absensi hari ini
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Izin / Permission Section */}
-      {usersWithoutAttendance.length > 0 && (
-        <div className="card" style={{ marginBottom: '20px', borderLeft: '4px solid var(--color-primary)' }}>
-          <div className="card-header">
-            <h2><LuShieldCheck style={{ marginRight: '8px' }} /> Berikan Izin Peserta</h2>
-            <span className="badge badge--default">{usersWithoutAttendance.length} Belum Absen</span>
-          </div>
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: '60px' }}>No</th>
-                  <th>Nama Peserta</th>
-                  <th>Sekolah</th>
-                  <th>Nomor HP</th>
-                  <th>ID Fingerprint</th>
-                  <th>Divisi</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usersWithoutAttendance.map((user, index) => (
-                  <tr key={user.id}>
-                    <td>{index + 1}</td>
-                    <td className="td-name">{user.name}</td>
-                    <td>{user.institution || user.school || '-'}</td>
-                    <td>{user.phone || '-'}</td>
-                    <td>
-                      <code className="fingerprint-id">{getDisplayId(user.fingerprintId, user.division)}</code>
-                    </td>
-                    <td>{user.division || '-'}</td>
-                    <td>
-                      <button
-                        className="btn btn--secondary"
-                        onClick={() => openLeaveModal(user)}
-                        style={{ padding: '6px 14px', fontSize: '12px', display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        <LuShieldCheck style={{ marginRight: '5px' }} /> Beri Izin
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Attendance Table */}
-      <div className="card">
-        <div className="card-header">
-          <h2>Daftar Absensi Hari Ini</h2>
-          <span className="badge badge--info">{attendance.length} orang</span>
-        </div>
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>Nama Peserta</th>
-                <th>ID Fingerprint</th>
-                <th>Lokasi</th>
-                <th>Jam Masuk</th>
-                <th>Jam Keluar</th>
-                <th>Status</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {attendance.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="table-empty">
-                    Belum ada data absensi hari ini
-                  </td>
-                </tr>
-              ) : (
-                attendance.map((item, index) => (
-                  <tr key={item.id} className="table-row-animate">
-                    <td>{index + 1}</td>
-                    <td className="td-name">{item.userName}</td>
-                    <td>
-                      <code className="fingerprint-id">{getDisplayId(item.fingerprintId, item.division)}</code>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span className={`badge badge--${item.location === 'sidedi' ? 'success' : item.location === 'izin' ? 'default' : 'info'}`}>
-                          {item.location === 'sidedi' ? 'Desa (SIDEDI)' : item.location === 'izin' ? 'Izin' : 'Kantor (KOMINFO)'}
-                        </span>
-                        {item.location === 'sidedi' && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                            <div style={{ flex: 1, minWidth: '60px', height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
-                              <div style={{ width: `${item.progress !== undefined && item.progress !== null ? item.progress : 0}%`, height: '100%', backgroundColor: '#10b981' }}></div>
-                            </div>
-                            <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#10b981' }}>{item.progress !== undefined && item.progress !== null ? item.progress : 0}%</span>
-                          </div>
-                        )}
-                        {item.location === 'izin' && item.leaveNote && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>
-                            Ket: {item.leaveNote}
-                          </span>
-                        )}
-                        {item.izin_sementara && item.izin_sementara.length > 0 && (
-                          <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {item.izin_sementara.map((iz, idx) => (
-                              <span key={idx} style={{ fontSize: '10px', color: 'var(--color-primary-light)', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 4px', borderRadius: '2px', display: 'inline-block' }}>
-                                ↪️ Keluar: {iz.jam_keluar} {iz.jam_kembali ? `| Kembali: ${iz.jam_kembali}` : '(Belum Kembali)'}
-                                {iz.keterangan && ` (${iz.keterangan})`}
+                  ) : (
+                    attendance.map((item, index) => (
+                      <tr key={item.id} className="table-row-animate">
+                        <td>{index + 1}</td>
+                        <td className="td-name">{item.userName}</td>
+                        <td>
+                          <code className="fingerprint-id">{getDisplayId(item.fingerprintId, item.division)}</code>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <span className={`badge badge--${item.location === 'sidedi' ? 'success' : item.location === 'izin' ? 'default' : 'info'}`}>
+                              {item.location === 'sidedi' ? 'Desa (SIDEDI)' : item.location === 'izin' ? 'Izin' : 'Kantor (KOMINFO)'}
+                            </span>
+                            {item.location === 'sidedi' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                                <div style={{ flex: 1, minWidth: '60px', height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${item.progress !== undefined && item.progress !== null ? item.progress : 0}%`, height: '100%', backgroundColor: '#10b981' }}></div>
+                                </div>
+                                <span style={{ fontSize: '10px', fontWeight: 'bold', color: '#10b981' }}>{item.progress !== undefined && item.progress !== null ? item.progress : 0}%</span>
+                              </div>
+                            )}
+                            {item.location === 'izin' && item.leaveNote && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>
+                                Ket: {item.leaveNote}
                               </span>
-                            ))}
+                            )}
+                            {item.izin_sementara && item.izin_sementara.length > 0 && (
+                              <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                {item.izin_sementara.map((iz, idx) => (
+                                  <span key={idx} style={{ fontSize: '10px', color: 'var(--color-primary-light)', background: 'rgba(99, 102, 241, 0.1)', padding: '2px 4px', borderRadius: '2px', display: 'inline-block' }}>
+                                    ↪️ Keluar: {iz.jam_keluar} {iz.jam_kembali ? `| Kembali: ${iz.jam_kembali}` : '(Belum Kembali)'}
+                                    {iz.keterangan && ` (${iz.keterangan})`}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td>{formatTime(item.checkIn)}</td>
-                    <td>{item.checkOut ? formatTime(item.checkOut) : <span className="text-muted">—</span>}</td>
-                    <td>
-                      <StatusBadge status={getAttendanceStatus(item)} />
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        {item.checkIn && !item.checkOut && item.location !== 'izin' && (() => {
-                          const hasActiveExit = item.izin_sementara && item.izin_sementara.length > 0 && item.izin_sementara[item.izin_sementara.length - 1].jam_kembali === null;
-                          if (hasActiveExit) {
-                            return (
-                              <button
-                                className="btn"
-                                onClick={() => handleTemporaryReturn(item.id)}
-                                style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#10b981', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
-                                title="Catat Kembali dari Izin Keluar Sementara"
-                              >
-                                Kembali
-                              </button>
-                            );
-                          } else {
-                            return (
-                              <button
-                                className="btn"
-                                onClick={() => handleTemporaryExit(item.id)}
-                                style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#f59e0b', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
-                                title="Izin Keluar Sementara"
-                              >
-                                Keluar
-                              </button>
-                            );
-                          }
-                        })()}
-                        <button
-                          className="btn btn--icon btn--delete"
-                          onClick={() => handleDelete(item.id, item.userName)}
-                          title="Hapus Absen"
-                        >
-                          <LuTrash2 />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                        </td>
+                        <td>{formatTime(item.checkIn)}</td>
+                        <td>{item.checkOut ? formatTime(item.checkOut) : <span className="text-muted">—</span>}</td>
+                        <td>
+                          <StatusBadge status={getAttendanceStatus(item)} />
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {item.checkIn && !item.checkOut && item.location !== 'izin' && (() => {
+                              const hasActiveExit = item.izin_sementara && item.izin_sementara.length > 0 && item.izin_sementara[item.izin_sementara.length - 1].jam_kembali === null;
+                              if (hasActiveExit) {
+                                return (
+                                  <button
+                                    className="btn"
+                                    onClick={() => handleTemporaryReturn(item.id)}
+                                    style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#10b981', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+                                    title="Catat Kembali dari Izin Keluar Sementara"
+                                  >
+                                    Kembali
+                                  </button>
+                                );
+                              } else {
+                                return (
+                                  <button
+                                    className="btn"
+                                    onClick={() => handleTemporaryExit(item.id)}
+                                    style={{ padding: '6px 10px', fontSize: '11px', backgroundColor: '#f59e0b', color: 'white', borderRadius: '4px', border: 'none', cursor: 'pointer' }}
+                                    title="Izin Keluar Sementara"
+                                  >
+                                    Keluar
+                                  </button>
+                                );
+                              }
+                            })()}
+                            <button
+                              className="btn btn--icon btn--delete"
+                              onClick={() => handleDelete(item.id, item.userName)}
+                              title="Hapus Absen"
+                            >
+                              <LuTrash2 />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
         </>
       )}
