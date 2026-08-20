@@ -6,12 +6,14 @@ import { getTodaySchedules } from '../services/sidediService';
 import StatsCard from '../components/StatsCard';
 import StatusBadge from '../components/StatusBadge';
 import { getDayType, syncHolidays, getCachedHolidays } from '../services/holidayService';
+import { isMqttConnected } from '../components/MqttListener';
 
 export default function Dashboard() {
   const [attendance, setAttendance] = useState([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [sidediSchedules, setSidediSchedules] = useState([]);
   const [activeUsers, setActiveUsers] = useState([]);
+  const [mqttOnline, setMqttOnline] = useState(false);
 
   // Holiday / Special Schedule States
   const [dayType, setDayType] = useState('normal'); // 'weekend' | 'libur_nasional' | 'normal'
@@ -45,6 +47,14 @@ export default function Dashboard() {
       setAttendance(data);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Poll status koneksi MQTT setiap 3 detik untuk indikator heartbeat
+  useEffect(() => {
+    const checkMqtt = () => setMqttOnline(isMqttConnected());
+    checkMqtt(); // cek segera
+    const id = setInterval(checkMqtt, 3000);
+    return () => clearInterval(id);
   }, []);
 
   const fetchDayStatus = async () => {
@@ -418,7 +428,13 @@ export default function Dashboard() {
           <button className="btn btn--secondary" onClick={() => setShowPrintModal(true)}>
             <LuPrinter style={{ marginRight: '8px' }} /> Ringkasan
           </button>
-          <span className="live-clock__dot"></span>
+          <span
+            className="live-clock__dot"
+            style={{
+              background: mqttOnline ? 'var(--color-success)' : '#ef4444',
+            }}
+            title={mqttOnline ? 'MQTT Terhubung — Heartbeat aktif ke ESP32' : 'MQTT Terputus — ESP32 akan gunakan jalur HTTPS'}
+          ></span>
           <span className="live-clock__time">{formatTime(currentTime)}</span>
         </div>
       </div>

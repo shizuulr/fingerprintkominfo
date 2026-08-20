@@ -12,6 +12,9 @@ const TOPIC_ENROLL_RESULT = 'absensipkl_temanggung_2026/enroll_result';
 const TOPIC_DELETE_REQUEST = 'absensipkl_temanggung_2026/delete_request';
 const TOPIC_DELETE_RESULT = 'absensipkl_temanggung_2026/delete_result';
 const TOPIC_RESET_REQUEST = 'absensipkl_temanggung_2026/reset_request';
+const TOPIC_HEARTBEAT = 'absensipkl_temanggung_2026/web_heartbeat';
+
+const HEARTBEAT_INTERVAL_MS = 10000; // 10 detik
 
 // Callback untuk meneruskan hasil delete_result ke komponen pemanggil
 let deleteResultCallback = null;
@@ -25,15 +28,27 @@ export function unregisterDeleteResultCallback() {
 }
 
 /**
+ * Mengecek apakah koneksi MQTT saat ini aktif.
+ * Bisa dipanggil dari komponen lain untuk menampilkan status koneksi.
+ * @returns {boolean}
+ */
+export function isMqttConnected() {
+  return window.mqttClient && window.mqttClient.connected;
+}
+
+/**
  * Komponen ini berjalan di background (di-mount di App.jsx).
  * Menangani 2 arah komunikasi MQTT:
  * 1. Menerima 'scan' (absen) dari ESP32 -> tulis ke raw_scans
  * 2. Menerima 'enroll_result' dari ESP32 -> update fingerprintId di users
+ * 3. Mempublish heartbeat retained setiap 10 detik ke topic web_heartbeat,
+ *    agar ESP32 bisa menentukan jalur pengiriman data (MQTT vs HTTPS).
  * Juga menyediakan fungsi publishEnrollRequest() untuk dipanggil
  * dari halaman pendaftaran user, supaya bisa mengirim 'enroll_request'.
  */
 export default function MqttListener() {
   const clientRef = useRef(null);
+  const heartbeatIntervalRef = useRef(null);
 
   useEffect(() => {
     const client = mqtt.connect(MQTT_BROKER_URL, {
@@ -53,6 +68,28 @@ export default function MqttListener() {
       client.subscribe(TOPIC_SCAN);
       client.subscribe(TOPIC_ENROLL_RESULT);
       client.subscribe(TOPIC_DELETE_RESULT);
+
+      // ── Heartbeat Publisher ──
+      // Kirim heartbeat retained pertama segera setelah terhubung,
+      // lalu ulang setiap 10 detik. Retained = true supaya ESP32 yang
+      // baru reconnect/reboot langsung tahu timestamp heartbeat terakhir
+      // tanpa menunggu interval berikutnya.
+      const publishHeartbeat = () => {
+        if (client.connected) {
+          const payload = JSON.stringify({ timestamp: Date.now() });
+          client.publish(TOPIC_HEARTBEAT, payload, { retain: true, qos: 1 });
+        }
+      };
+
+      // Kirim langsung satu kali saat connect
+      publishHeartbeat();
+
+      // Bersihkan interval lama jika ada (bisa terjadi saat reconnect)
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+      heartbeatIntervalRef.current = setInterval(publishHeartbeat, HEARTBEAT_INTERVAL_MS);
+      console.log('MQTT: heartbeat publisher aktif (interval 10 detik, retained)');
     });
 
     client.on('message', async (topic, message) => {
@@ -99,6 +136,11 @@ export default function MqttListener() {
     window.addEventListener('pageshow', handlePageShow);
 
     return () => {
+      // Bersihkan heartbeat interval
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pageshow', handlePageShow);
       client.end(true); // force close untuk mencegah koneksi zombie saat React StrictMode / Hot-Reload
@@ -242,4 +284,5 @@ export function publishResetRequest() {
   console.log('MQTT: reset_request dikirim ->', payload);
   return true;
 }
+
 

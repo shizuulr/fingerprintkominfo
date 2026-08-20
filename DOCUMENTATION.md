@@ -490,6 +490,7 @@ Firmware ESP32 berada pada folder `/absensi_pkl_hcsr04_buzzer_led__1_/absensi_pk
 | `absensipkl_temanggung_2026/delete_request` | Web SPA ➔ ESP32 | `{"fingerprintId": 5}` atau `{"fingerprintId": "ALL"}` | Perintah hapus sidik jari tertentu / reset total. |
 | `absensipkl_temanggung_2026/delete_result` | ESP32 ➔ Web SPA | `{"fingerprintId": 5, "success": true}` | Balasan hasil penghapusan sidik jari. |
 | `absensipkl_temanggung_2026/reset_request` | Web SPA ➔ ESP32 | `{"action": "restart", "timestamp": 1690000000}` | Perintah khusus untuk merestart module ESP32 (Remote Reset). |
+| `absensipkl_temanggung_2026/web_heartbeat` | Web SPA ➔ ESP32 | `{"timestamp": 1724137221000}` | Sinyal kehidupan (heartbeat) dari web agar ESP32 tahu apakah web sedang aktif atau tidak (retained). |
 
 --- 
 
@@ -717,3 +718,9 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
   - **`src/pages/AttendanceHistory.jsx`**: Menambahkan tombol **Download Rekap** pada hasil pencarian riwayat absensi berdasarkan **Tanggal Tertentu** atau **Rentang Tanggal**. File hasil unduhan berisi data absensi difilter sesuai periode aktif.
   - **Format Cetak Seragam**: Mengatur layout print/unduhan agar mengikuti format formal modul peserta dan menambahkan slot tanda tangan di bagian bawah dengan format kosong untuk diisi manual, tanpa menampilkan nama pada baris tanda tangan.
   - **Tujuan**: Mempercepat verifikasi peserta dan menyiapkan laporan absensi yang lebih rapi, formal, dan siap dicetak untuk kebutuhan administrasi.
+
+### 20.10. Fitur Web Heartbeat Publisher & Indikator Koneksi MQTT (Agustus 2026)
+- **Latar Belakang**: Karena logika pencatatan absensi berjalan sepenuhnya di frontend browser (`MqttListener`), ESP32 membutuhkan informasi apakah ada browser yang sedang membuka dashboard atau tidak. Jika tidak ada browser yang merespons, ESP32 harus dialihkan ke jalur komunikasi HTTPS (REST) sebagai fallback agar data tidak hilang.
+- **Implementasi Utama**:
+  - **`MqttListener.jsx`**: Menambahkan *interval publisher* yang secara otomatis mengirim payload JSON berisi *timestamp* ke topik MQTT `absensipkl_temanggung_2026/web_heartbeat` setiap 10 detik. Pesan ini dikirim secara eksplisit dengan flag `{ retain: true }` supaya ESP32 yang baru saja di-*reboot* bisa langsung mendeteksi status *heartbeat* web terakhir tanpa menunggu interval 10 detik berikutnya.
+  - **`Dashboard.jsx`**: Menambahkan antarmuka visual berupa *badge indicator* berdenyut (menyerupai *live-clock dot*) di kanan atas layar. Indikator ini melakukan *polling* setiap 3 detik terhadap koneksi MQTT dan akan berwarna Hijau saat terhubung (*Heartbeat aktif*) atau Merah saat terputus (*ESP32 mode HTTPS*).
