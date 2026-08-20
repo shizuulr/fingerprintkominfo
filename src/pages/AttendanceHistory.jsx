@@ -3,6 +3,7 @@ import { LuSearch, LuCalendarDays, LuTrash2, LuX, LuPrinter } from 'react-icons/
 import { getAttendanceByDate, getAttendanceByDateRange, deleteAttendanceLog, deleteAllAttendanceLogs, getAttendanceStatus, deleteOrphanAttendanceLogs } from '../services/attendanceService';
 import { getCompletedInterns, deleteCompletedIntern } from '../services/userService';
 import StatusBadge from '../components/StatusBadge';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 export default function AttendanceHistory() {
   const [filterType, setFilterType] = useState('single'); // 'single', 'range', or 'completed'
@@ -155,7 +156,7 @@ export default function AttendanceHistory() {
           <td style="border: 1px solid #d1d5db; padding: 8px;">${formatDateDisplay(item.date)}</td>
           <td style="border: 1px solid #d1d5db; padding: 8px;">${item.userName || '-'}</td>
           <td style="border: 1px solid #d1d5db; padding: 8px;">${item.institution || '-'}</td>
-          <td style="border: 1px solid #d1d5db; padding: 8px;">${item.startDate && item.endDate ? `${item.startDate} s/d ${item.endDate}` : '-'}</td>
+          <td style="border: 1px solid #d1d5db; padding: 8px;">${item.startDate && item.endDate ? `${formatIndoDate(item.startDate)} s/d ${formatIndoDate(item.endDate)}` : '-'}</td>
           <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${checkIn}</td>
           <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${checkOut}</td>
           <td style="border: 1px solid #d1d5db; padding: 8px; text-align: center;">${location}</td>
@@ -499,7 +500,7 @@ export default function AttendanceHistory() {
               <tr>
                 <td class="label">Periode Magang</td>
                 <td class="colon">:</td>
-                <td>${intern.startDate ? `${intern.startDate} s/d ${intern.endDate}` : '-'}</td>
+                <td>${intern.startDate ? `${formatIndoDate(intern.startDate)} s/d ${formatIndoDate(intern.endDate)}` : '-'}</td>
               </tr>
               <tr>
                 <td class="label">Pembimbing</td>
@@ -765,7 +766,7 @@ export default function AttendanceHistory() {
                       <td>{formatDateDisplay(item.date)}</td>
                       <td className="td-name">{item.userName}</td>
                       <td>{item.institution || '-'}</td>
-                      <td>{item.startDate && item.endDate ? `${item.startDate} s/d ${item.endDate}` : '-'}</td>
+                      <td>{item.startDate && item.endDate ? `${formatIndoDate(item.startDate)} s/d ${formatIndoDate(item.endDate)}` : '-'}</td>
                       <td>{formatTime(item.checkIn)}</td>
                       <td>{item.checkOut ? formatTime(item.checkOut) : <span className="text-muted">—</span>}</td>
                       <td>
@@ -833,7 +834,7 @@ export default function AttendanceHistory() {
                       <td className="td-name">{intern.name}</td>
                       <td>{intern.institution || '-'}</td>
                       <td>{intern.major || '-'}</td>
-                      <td>{intern.startDate && intern.endDate ? `${intern.startDate} s/d ${intern.endDate}` : '-'}</td>
+                      <td>{intern.startDate && intern.endDate ? `${formatIndoDate(intern.startDate)} s/d ${formatIndoDate(intern.endDate)}` : '-'}</td>
                       <td>
                         <span style={{ color: 'green', fontWeight: 'bold', fontSize: '11px', marginRight: '6px' }}>H: {intern.totalHadir || 0}</span>
                         <span style={{ color: '#6366f1', fontWeight: 'bold', fontSize: '11px', marginRight: '6px' }}>I: {intern.totalIzin || 0}</span>
@@ -893,7 +894,7 @@ export default function AttendanceHistory() {
                 <div>
                   <p style={{ margin: '4px 0' }}><strong>Pembimbing:</strong> {selectedIntern.advisor || '-'}</p>
                   <p style={{ margin: '4px 0' }}><strong>No HP Pembimbing:</strong> {selectedIntern.no_hp_pembimbing || '-'}</p>
-                  <p style={{ margin: '4px 0' }}><strong>Periode Magang:</strong> {selectedIntern.startDate} s/d {selectedIntern.endDate}</p>
+                  <p style={{ margin: '4px 0' }}><strong>Periode Magang:</strong> {formatIndoDate(selectedIntern.startDate)} s/d {formatIndoDate(selectedIntern.endDate)}</p>
                   <p style={{ margin: '4px 0' }}>
                     <strong>Total Kehadiran:</strong>{' '}
                     <span style={{ color: 'green', fontWeight: 'bold' }}>Hadir: {selectedIntern.totalHadir || 0}</span>,{' '}

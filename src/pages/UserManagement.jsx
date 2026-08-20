@@ -5,6 +5,7 @@ import { getAttendanceByFingerprintId, deleteAttendanceByFingerprintId } from '.
 import { getAllSidediLocations } from '../services/sidediService';
 import { publishEnrollRequest, publishDeleteRequest, publishClearAllRequest, registerDeleteResultCallback, unregisterDeleteResultCallback } from '../components/MqttListener';
 import Modal from '../components/Modal';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 const initialFormData = {
   name: '',
@@ -783,7 +784,7 @@ export default function UserManagement() {
                 <td class="label">Pembimbing</td><td class="colon">:</td><td>${user.advisor || '-'}</td>
               </tr>
               <tr>
-                <td class="label">Periode PKL</td><td class="colon">:</td><td>${user.startDate && user.endDate ? user.startDate + ' s/d ' + user.endDate : '-'}</td>
+                <td class="label">Periode PKL</td><td class="colon">:</td><td>${user.startDate && user.endDate ? formatIndoDate(user.startDate) + ' s/d ' + formatIndoDate(user.endDate) : '-'}</td>
                 <td class="label">Desa SIDEDI</td><td class="colon">:</td><td>${desaPlacement}</td>
               </tr>
             </table>
@@ -1124,7 +1125,7 @@ export default function UserManagement() {
                     <td>{user.division ? user.division : <span className="badge badge--danger">-</span>}</td>
                     <td>
                       {user.startDate && user.endDate
-                        ? `${user.startDate} s/d ${user.endDate}`
+                        ? `${formatIndoDate(user.startDate)} s/d ${formatIndoDate(user.endDate)}`
                         : <span className="badge badge--danger">-</span>}
                     </td>
                     <td>{user.socialMedia ? user.socialMedia : <span className="badge badge--danger">-</span>}</td>

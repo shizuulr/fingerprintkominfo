@@ -62,12 +62,16 @@ export const getWorkSchedule = async () => {
   return WORK_SCHEDULE;
 };
 
-export const getTodayDate = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+// >>> BARU: helper terpisah supaya bisa dipakai untuk tanggal "hari ini" MAUPUN tanggal spesifik
+export const getDateStringFromDate = (dateObj) => {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+export const getTodayDate = () => {
+  return getDateStringFromDate(new Date()); // >>> DIUBAH: reuse helper baru
 };
 
 export const isOffDay = (date = new Date()) => {
@@ -142,10 +146,16 @@ export const getAttendanceByDateRange = async (startDate, endDate) => {
 
 /**
  * Proses scan fingerprint — logika masuk/keluar otomatis
+ * @param {number} fingerprintId
+ * @param {string} userName
+ * @param {string} division
+ * @param {Date|null} [scanTime] - >>> BARU: Waktu ASLI saat sidik jari discan (dari raw_scans.receivedAt).
+ *                                  Kalau null/tidak diberikan, fallback ke waktu saat ini (perilaku lama).
  */
-export const processAttendanceScan = async (fingerprintId, userName = 'Unknown', division = '') => {
-  const now = new Date();
-  const today = getTodayDate();
+export const processAttendanceScan = async (fingerprintId, userName = 'Unknown', division = '', scanTime = null) => {
+  // >>> DIUBAH: pakai waktu asli scan kalau tersedia dan valid, kalau tidak fallback ke waktu proses sekarang
+  const now = (scanTime instanceof Date && !isNaN(scanTime)) ? scanTime : new Date();
+  const today = getDateStringFromDate(now); // >>> DIUBAH: sebelumnya getTodayDate(), sekarang ikut waktu asli
 
   // Cek tipe hari (weekend tidak diizinkan sama sekali)
   const dayType = await getDayType(today);

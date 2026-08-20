@@ -7,6 +7,7 @@ import StatsCard from '../components/StatsCard';
 import StatusBadge from '../components/StatusBadge';
 import { getDayType, syncHolidays, getCachedHolidays } from '../services/holidayService';
 import { isMqttConnected } from '../components/MqttListener';
+import { formatIndoDate } from '../utils/dateFormatter';
 
 export default function Dashboard() {
   const [attendance, setAttendance] = useState([]);
@@ -372,7 +373,7 @@ export default function Dashboard() {
 
           const matchedUser = activeUsers.find(u => u.fingerprintId === item.fingerprintId);
           const pklDuration = matchedUser && matchedUser.startDate && matchedUser.endDate
-            ? `${matchedUser.startDate} s/d ${matchedUser.endDate}`
+            ? `${formatIndoDate(matchedUser.startDate)} s/d ${formatIndoDate(matchedUser.endDate)}`
             : '-';
 
           const displayId = getDisplayId(item.fingerprintId, item.division || (matchedUser ? matchedUser.division : ''));

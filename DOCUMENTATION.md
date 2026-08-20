@@ -447,12 +447,13 @@ Menyimpan snapshot log dari perangkat saat admin/pengembang mendeteksi masalah a
 - `getDayType(dateStr)`: Fungsi sentral penentu hari libur nasional, libur khusus/agenda (termasuk cuti bersama), akhir pekan (Sabtu/Minggu), atau hari kerja normal.
 
 ### 11.5. `debugService.js`
-- `initGlobalErrorHandler()`: Memonitor error tak tertangani (`onerror`, `onunhandledrejection`) pada sesi aplikasi yang berjalan.
-- `sendDebugSnapshot()`: Mengumpulkan data vital (koneksi, MQTT, UserAgent) lalu mengirimkannya ke koleksi `system_debug_logs`.
-- `analyzeDebugLog(logData)`: Menerjemahkan data teknis dan *stack trace* menjadi panduan (*warning* / *error* / *success*) berbahasa Indonesia.
-- `toggleEruda()`: Memuat *in-app DevTools Console* (`eruda`) secara *lazy-load* saat dibutuhkan (khusus debugging).
+- `captureError(error, context)`: Menangkap uncaught error dan unhandled rejection secara global.
+- `sendSystemDebugSnapshot(extraInfo)`: Mengirim snapshot status sistem, memory, online status, dan data konfigurasi ke koleksi `system_debug_logs`.
+- `subscribeToDebugLogs(callback)`: Mendengarkan log error dari Firestore untuk ditampilkan pada `DebugLogsViewer`.
+- `deleteDebugLog(logId)` & `deleteAllDebugLogs()`: Pembersihan data log debug.
 
----
+### 11.6. `dateFormatter.js` (Utils)
+- `formatIndoDate(dateStr)`: Mengonversi format tanggal ISO `YYYY-MM-DD` menjadi format teks Indonesia panjang baku (contoh: `17 Agustus 2026`), aman terhadap nilai kosong atau invalid.
 
 ## 12. Firmware ESP32 (Hardware)
 
@@ -731,3 +732,17 @@ Tombol fisik yang terhubung ke **GPIO 4** ESP32 berfungsi sebagai *hard restart*
   - **`Dashboard.jsx` (Ringkasan Absensi Global)**: Mengubah format penanggalan pada baris tabel rekap dan judul periode cetak dari format ISO/angka (`YYYY-MM-DD`) menjadi format Indonesia panjang (`d MMMM yyyy`), serta menyelaraskan teks *Dicetak pada* menjadi format tanggal yang sama.
   - **`AttendanceHistory.jsx` (Riwayat Absensi)**: Menyelaraskan teks judul periode unduh ("Tanggal 17 Agustus 2026" atau "Rentang 12 Agustus 2026 s/d 20 Agustus 2026") dan kolom tanggal tabel agar konsisten menampilkan tanggal tanpa nama hari berlebih pada cetakan.
   - **`SidediInternship.jsx` (Penjadwalan Magang SIDEDI)**: Menyesuaikan catatan kaki cetak (*footer* cetak dokumen) ke format standar Indonesia formal.
+
+### 20.12. Dukungan Waktu Asli Scan (Real Scan Timestamp) & Format Periode PKL (20 Agustus 2026)
+- **Latar Belakang**:
+  1. Sebelumnya, pencatatan absensi menggunakan `new Date()` pada saat worker frontend (`ScanProcessor`) mengeksekusi antrean `raw_scans`. Jika browser admin baru dibuka beberapa saat kemudian atau terjadi antrean, scan yang sebenarnya dilakukan tepat waktu (misal 07:28) dapat keliru tercatat sebagai "Terlambat" (misal 07:32) atau bahkan tercatat di tanggal yang salah jika diproses esok hari.
+  2. Tampilan rentang Periode PKL di tabel antarmuka peserta dan riwayat sebelumnya masih menggunakan format ISO angka mentah (`YYYY-MM-DD s/d YYYY-MM-DD`).
+- **Implementasi Utama**:
+  - **`attendanceService.js`**:
+    - Menambahkan helper `getDateStringFromDate(dateObj)` untuk format string tanggal ISO dari objek `Date` spesifik, serta memfaktorkan ulang `getTodayDate()`.
+    - Memperbarui `processAttendanceScan(fingerprintId, userName, division, scanTime)` untuk menerima parameter ke-4 `scanTime` opsional. Jika `scanTime` valid (dari `raw_scans.receivedAt.toDate()`), variabel waktu `now` dan tanggal dokumen `today` (`getDateStringFromDate(now)`) menggunakan waktu asli tersebut, dengan fallback ke `new Date()` jika null.
+  - **`ScanProcessor.jsx`**:
+    - Mengekstrak `receivedAt` dari dokumen `raw_scans` dan meneruskannya sebagai `scanTime` ke fungsi `processAttendanceScan()`.
+  - **`dateFormatter.js` (`src/utils/dateFormatter.js`) & Pembaruan UI**:
+    - Membuat modul helper `formatIndoDate(dateStr)` untuk memformat string tanggal menjadi teks bahasa Indonesia formal (`17 Agustus 2026`).
+    - Memperbarui tampilan Periode PKL pada halaman **Manajemen Peserta (`UserManagement.jsx`)**, **Riwayat Absensi (`AttendanceHistory.jsx`)**, dan **Dashboard (`Dashboard.jsx`)** sehingga tampil rapi dan seragam dalam format nama bulan panjang (contoh: `17 Agustus 2026 s/d 17 November 2026`).
